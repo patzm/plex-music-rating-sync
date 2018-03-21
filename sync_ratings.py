@@ -39,10 +39,11 @@ def connect_to_plex(options):
 		exit(1)
 
 	try:
-		plex = account.resource(options.server).connect(timeout=60)
+		plex = account.resource(options.server).connect(timeout=5)
+		print('Success: Connected to plex server {}'.format(options.server))
 	except NotFound:
 		# This also happens if the user is not the owner of the server
-		print('Unable to connect to the server {}'.format(options.server))
+		print('Error: Unable to connect to the server {}'.format(options.server))
 		exit(1)
 
 	return plex
