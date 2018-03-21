@@ -65,7 +65,9 @@ def match_tracks(tracks, library):
 	for track in tracks:
 		print('Searching for track "{}"'.format(track))
 		match = None
-		for result in library.searchTracks(title=track.title.lower()):
+		results = library.searchTracks(title=track.title.lower())
+		for result in results:
+			# FIXME: add fuzzy metadata matching
 			if result.title == track.title and result.artist().title == track.artist and result.album().title == track.album:
 				match = result
 				if 'userRating' in match._data.attrib:
