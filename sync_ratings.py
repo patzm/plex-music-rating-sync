@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import argparse
 import locale
 import getpass
@@ -100,9 +102,9 @@ def select_music_library(plex):
 
 def parse_args():
 	parser = argparse.ArgumentParser(description='Synchronizes ID3 music ratings with a Plex media-server')
-	parser.add_argument('--server', type=str, help='The name of the plex media server')
-	parser.add_argument('--username', type=str, help='The plex username')
-	parser.add_argument('--player', type=str, help='Media player to synchronize with Plex')
+	parser.add_argument('--server', type=str, required=True, help='The name of the plex media server')
+	parser.add_argument('--username', type=str, required=True, help='The plex username')
+	parser.add_argument('--player', type=str, required=True, help='Media player to synchronize with Plex')
 	return parser.parse_args()
 
 
