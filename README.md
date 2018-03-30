@@ -19,4 +19,3 @@ The relevant model documentation is available [here](http://www.mediamonkey.com/
 * Python 3.5 packages:
     * [PlexAPI](https://pypi.org/project/PlexAPI/)
     * [pypiwin32](https://pypi.org/project/pypiwin32/)
-    * [pythondialog](https://pypi.org/project/pythondialog/)
