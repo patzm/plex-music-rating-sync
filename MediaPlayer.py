@@ -3,6 +3,7 @@ from AudioTag import AudioTag
 
 class MediaPlayer:
 	name = ''
+	album_empty_alias = ''
 	rating_maximum = 5
 
 	@staticmethod
@@ -12,13 +13,20 @@ class MediaPlayer:
 	def get_normed_rating(self, rating):
 		return rating / self.rating_maximum
 
+	def get_native_rating(self, normed_rating):
+		return normed_rating * self.rating_maximum
+
 	def read_tracks(self):
 		raise NotImplementedError()
+
+	def album_empty(self, album):
+		return album == self.album_empty_alias
 
 
 class MediaMonkey(MediaPlayer):
 	def __init__(self):
 		self.name = 'MediaMonkey'
+		self.album_empty_alias = '[Unknown Album]'
 		self.rating_maximum = 100
 
 	def read_tracks(self):
