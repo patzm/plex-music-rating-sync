@@ -20,13 +20,12 @@ class MediaPlayer:
 		raise NotImplementedError()
 
 	def album_empty(self, album):
-		return album == self.album_empty_alias
+		return album.lower() == self.album_empty_alias.lower()
 
 
 class MediaMonkey(MediaPlayer):
 	def __init__(self):
 		self.name = 'MediaMonkey'
-		self.album_empty_alias = '[Unknown Album]'
 		self.rating_maximum = 100
 
 	def read_tracks(self):
@@ -60,6 +59,7 @@ class MediaMonkey(MediaPlayer):
 class PlexPlayer(MediaPlayer):
 	def __init__(self):
 		self.name = 'PlexPlayer'
+		self.album_empty_alias = '[Unknown Album]'
 		self.rating_maximum = 10
 
 	def read_tracks(self):

@@ -117,12 +117,11 @@ class PlexSync:
 					if self.albums_matching(local_track.album, _remote_track.album().title):
 						remote_track = _remote_track
 						break
-
-				if remote_track is None:
-					self.logger.debug('did not match "{} - {} - {}"'.format(
-						_remote_track.artist().title, _remote_track.album().title, _remote_track.title
-					))
-				else:
+					else:
+						self.logger.debug('did not match "{} - {} - {}"'.format(
+							_remote_track.artist().title, _remote_track.album().title, _remote_track.title
+						))
+				if remote_track is not None:
 					break
 
 			if remote_track is None:
