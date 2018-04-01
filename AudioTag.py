@@ -1,10 +1,10 @@
 class AudioTag(object):
+	rating = 0
+	genre = ''
 
 	def __init__(self, artist='', album='', title=''):
 		self.album = album
 		self.artist = artist
-		self.genre = ''
-		self.rating = 0
 		self.title = title
 
 	def __str__(self):
