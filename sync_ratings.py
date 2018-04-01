@@ -3,9 +3,15 @@
 import argparse
 import locale
 import logging
+import sys
 
 from sync_pair import *
 from MediaPlayer import MediaPlayer, MediaMonkey, PlexPlayer
+
+
+class InfoFilter(logging.Filter):
+	def filter(self, rec):
+		return rec.levelno in (logging.DEBUG, logging.INFO)
 
 
 class PlexSync:
@@ -40,13 +46,31 @@ class PlexSync:
 			exit(1)
 
 	def setup_logging(self):
-		ch = logging.StreamHandler()
-		formatter = logging.Formatter(
-			fmt="[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s",
-			datefmt="%H:%M:%S"
-		)
-		ch.setFormatter(formatter)
+		self.logger.setLevel(logging.DEBUG)
 
+		# Set up the two formatters
+		formatter_brief = logging.Formatter(fmt='[%(asctime)s] %(levelname)s: %(message)s', datefmt='%H:%M:%S')
+		formatter_explicit = logging.Formatter(
+			fmt='[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s',
+			datefmt='%H:%M:%S'
+		)
+
+		# Set up the file logger
+		fh = logging.FileHandler(filename='sync_ratings.log', mode='w')
+		fh.setLevel(logging.DEBUG)
+		fh.setFormatter(formatter_explicit)
+		self.logger.addHandler(fh)
+
+		# Set up the error / warning command line logger
+		ch_err = logging.StreamHandler(stream=sys.stderr)
+		ch_err.setFormatter(formatter_explicit)
+		ch_err.setLevel(logging.WARNING)
+		self.logger.addHandler(ch_err)
+
+		# Set up the verbose info / debug command line logger
+		ch_std = logging.StreamHandler(stream=sys.stdout)
+		ch_std.setFormatter(formatter_brief)
+		ch_std.addFilter(InfoFilter())
 		level = -1
 		if isinstance(self.options.log, str):
 			try:
@@ -63,9 +87,8 @@ class PlexSync:
 			)
 			raise RuntimeError('Invalid logging level selected: {}'.format(level))
 		else:
-			ch.setLevel(level)
-			self.logger.setLevel(level)
-			self.logger.addHandler(ch)
+			ch_std.setLevel(level)
+			self.logger.addHandler(ch_std)
 
 	def sync(self):
 		self.local_player.connect()
