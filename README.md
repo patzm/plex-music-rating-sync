@@ -30,3 +30,5 @@ The relevant model documentation is available [here](http://www.mediamonkey.com/
 * Python 3.5 packages:
     * [PlexAPI](https://pypi.org/project/PlexAPI/)
     * [pypiwin32](https://pypi.org/project/pypiwin32/)
+    * [fuzzywuzzy](https://github.com/seatgeek/fuzzywuzzy): for fuzzy string matching
+    * [python-Levenshtein](https://github.com/miohtama/python-Levenshtein) (optional): to improve performance of `fuzzywuzzy`
