@@ -21,7 +21,6 @@ class SyncState(Enum):
 class SyncPair(abc.ABC):
 	local = None
 	remote = None
-	candidates = []
 	sync_state = SyncState.UNKNOWN
 
 	def __init__(self, local_player, remote_player):
@@ -87,17 +86,25 @@ class TrackPair(SyncPair):
 		if remote is None: remote = self.remote
 		return self.local_player.album_empty(self.local.album) and self.remote_player.album_empty(remote.album().title)
 
-	def match(self):
+	def match(self, candidates=None, match_threshold=30):
 		if self.local is None: raise RuntimeError('Local track not set')
-		self.candidates = self.remote_player.search_tracks(title=self.local.title)
-		if len(self.candidates) == 0:
+		if candidates is None:
+			candidates = self.remote_player.search_tracks(title=self.local.title)
+		if len(candidates) == 0:
 			self.sync_state = SyncState.ERROR
 			self.logger.warning('No match found for {}'.format(self.local))
 			return 0
-		scores = np.array([self.similarity(candidate) for candidate in self.candidates])
+		scores = np.array([self.similarity(candidate) for candidate in candidates])
 		ranks = scores.argsort()
 		score = scores[ranks[-1]]
-		self.remote = self.candidates[ranks[-1]]
+		if score < match_threshold:
+			self.sync_state = SyncState.ERROR
+			self.logger.debug('Score of best candidate {} is too low: {} < {}'.format(
+				format_plexapi_track(candidates[ranks[-1]]), score, match_threshold
+			))
+			return score
+
+		self.remote = candidates[ranks[-1]]
 		self.logger.debug('Found match with score {} for {}: {}'.format(
 			score, self.local, format_plexapi_track(self.remote)
 		))
@@ -139,21 +146,30 @@ class TrackPair(SyncPair):
 		elif self.rating_remote == 0.0:
 			# Propagate the rating of the local track to the remote track
 			self.remote_player.update_rating(self.remote, self.rating_local)
+		else:
+			return False
+		return True
 
 
 class PlaylistPair(SyncPair):
-	def __init__(self, local_player, remote_player):
 	remote: [Playlist]
 
+	def __init__(self, local_player, remote_player, local_playlist):
 		"""
 		:type local_player: MediaPlayer.MediaPlayer
 		:type remote_player: MediaPlayer.PlexPlayer
+		:type local_playlist: Playlist
 		"""
 		super(PlaylistPair, self).__init__(local_player, remote_player)
 		self.logger = logging.getLogger('PlexSync.TrackPair')
+		self.local = local_playlist
 
 	def match(self):
-		raise NotImplementedError
+		"""
+		If the local playlist does not exist on the remote player, create it
+		:return: None
+		"""
+		self.remote = self.remote_player.find_playlist(title=self.local.name)
 
 	def resolve_conflict(self):
 		raise NotImplementedError
@@ -162,4 +178,24 @@ class PlaylistPair(SyncPair):
 		raise NotImplementedError
 
 	def sync(self):
-		raise NotImplementedError
+		"""
+		This sync routine is non-destructive and one-way. It will propagate local additions to the remote. Replicas
+		existing only on the remote will not be removed or propagated to the local replica.
+		:return: flag indicating success
+		:rtype: bool
+		"""
+		self.logger.info('Synchronizing playlist {}'.format(self.local.name))
+		track_pairs = [TrackPair(self.local_player, self.remote_player, track) for track in self.local.tracks]
+		for pair in track_pairs:
+			pair.match()
+
+		if self.remote is None: # create a new playlist with all tracks
+			remote_tracks = [pair.remote for pair in track_pairs if pair.remote is not None]
+			self.remote = self.remote_player.create_playlist(self.local.name, remote_tracks)
+		else: # playlist already exists, check which items need to be updated
+			remote_tracks = self.remote.items()
+			for pair in track_pairs:
+				if pair.remote not in remote_tracks:
+					self.remote_player.update_playlist(self.remote, pair.remote, True)
+
+		return True

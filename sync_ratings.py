@@ -118,7 +118,19 @@ class PlexSync:
 			pair.resolve_conflict()
 
 	def sync_playlists(self):
-		pass
+		playlists = self.local_player.read_playlists()
+		playlist_pairs = [PlaylistPair(self.local_player, self.remote_player, pl)
+		                  for pl in playlists if not pl.is_auto_playlist]
+
+		if self.options.dry: self.logger.info('Running a DRY RUN. No changes will be propagated!')
+
+		self.logger.info('Matching local playlists with remote player')
+		for pair in playlist_pairs:
+			pair.match()
+
+		self.logger.info('Synchronizing {} matching playlists'.format(len(playlist_pairs)))
+		for pair in playlist_pairs:
+			pair.sync()
 
 
 def parse_args():

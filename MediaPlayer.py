@@ -1,11 +1,14 @@
 import abc
 import logging
 import getpass
+import plexapi.playlist
+import plexapi.audio
 from plexapi.exceptions import BadRequest, NotFound
 from plexapi.myplex import MyPlexAccount
 import time
+from typing import List, Optional
 
-from sync_items import AudioTag
+from sync_items import AudioTag, Playlist
 from utils import *
 
 
@@ -31,6 +34,12 @@ class MediaPlayer(abc.ABC):
 	def connect(self, *args):
 		return NotImplemented
 
+	@abc.abstractmethod
+	def create_playlist(self, title: str, tracks: List[object]):
+		"""
+		Creates a playlist unless in dry run
+		"""
+
 	@staticmethod
 	def get_5star_rating(rating):
 		return rating * 5
@@ -43,15 +52,38 @@ class MediaPlayer(abc.ABC):
 
 	@abc.abstractmethod
 	def read_playlists(self):
-		"""Returns all playlists that are not automatically generated"""
+		"""
+
+		:return: a list of all playlists that exist, including automatically generated playlists
+		:rtype: list<Playlist>
+		"""
+
+	@abc.abstractmethod
+	def find_playlist(self, **nargs):
+		"""
+
+		:param nargs:
+		:return: a list of playlists matching the search parameters
+		:rtype: list<Playlist>
+		"""
 
 	@abc.abstractmethod
 	def search_tracks(self, **nargs):
 		"""Returns all tracks matching a particular query"""
 
 	@abc.abstractmethod
+	def update_playlist(self, playlist, track, present):
+		"""Updates the playlist, unless in dry run
+		:param playlist:
+			The playlist native to this player that shall be updated
+		:param track:
+			The track to update
+		:type present: bool
+		"""
+
+	@abc.abstractmethod
 	def update_rating(self, track, rating):
-		"""Updates the rating of the track"""
+		"""Updates the rating of the track, unless in dry run"""
 
 	def __hash__(self):
 		return hash(self.name().lower())
@@ -83,8 +115,45 @@ class MediaMonkey(MediaPlayer):
 			self.logger.error('No scripting interface to MediaMonkey can be found. Exiting...')
 			exit(1)
 
-	def read_playlists(self):
+	def create_playlist(self, title, tracks):
 		raise NotImplementedError
+
+	def find_playlist(self, **nargs):
+		raise NotImplementedError
+
+	def read_child_playlists(self, parent_playlist):
+		"""
+		:rtype: list<Playlist>
+		"""
+		playlists = []
+		for i in range(len(parent_playlist.ChildPlaylists)):
+			_playlist = parent_playlist.ChildPlaylists[i]
+			playlist = Playlist(_playlist.Title, parent_name=parent_playlist.Title)
+			playlists.append(playlist)
+			playlist.is_auto_playlist = _playlist.isAutoplaylist
+			if playlist.is_auto_playlist:
+				self.logger.debug('Skipping to read tracks for auto playlist {}'.format(playlist.name))
+				continue
+
+			for j in range(_playlist.Tracks.Count):
+				playlist.tracks.append(self.read_track_metadata(_playlist.Tracks[j]))
+
+			if len(_playlist.ChildPlaylists):
+				playlists.extend(self.read_child_playlists(_playlist))
+
+		return playlists
+
+	def read_playlists(self):
+		self.logger.info('Reading playlists from the {} player'.format(self.name()))
+		root_playlist = self.sdb.PlaylistByTitle('')
+		playlists = self.read_child_playlists(root_playlist)
+		self.logger.info('Found {} playlists'.format(len(playlists)))
+		return playlists
+
+	def read_track_metadata(self, track):
+		tag = AudioTag(track.Artist.Name, track.Album.Name, track.Title)
+		tag.rating = self.get_normed_rating(track.Rating)
+		return tag
 
 	def search_tracks(self, **kwargs):
 		self.logger.info('Reading tracks from the {} player'.format(self.name()))
@@ -94,15 +163,15 @@ class MediaMonkey(MediaPlayer):
 		tags = []
 		counter = 0
 		while not it.EOF:
-			tag = AudioTag(it.Item.Artist.Name, it.Item.Album.Name, it.Item.Title)
-			tag.rating = self.get_normed_rating(it.Item.Rating)
-			tags.append(tag)
-
+			tags.append(self.read_track_metadata(it.Item))
 			counter += 1
 			it.Next()
 
 		self.logger.info('Read {} tracks with a rating > 0'.format(counter + 1))
 		return tags
+
+	def update_playlist(self, playlist, track, present):
+		raise NotImplementedError
 
 	def update_rating(self, track, rating):
 		raise NotImplementedError
@@ -173,8 +242,35 @@ class PlexPlayer(MediaPlayer):
 			choice = input('Select the library to sync with: ')
 			self.music_library = music_libraries[choice]
 
+	def create_playlist(self, title, tracks: List[plexapi.audio.Track]) -> Optional[plexapi.playlist.Playlist]:
+		self.logger.info('Creating playlist {} on the server'.format(title))
+		if self.dry_run:
+			return None
+		else:
+			assert tracks is not None and len(tracks)
+			return self.plex_api_connection.createPlaylist(title=title, items=tracks)
+
 	def read_playlists(self):
 		raise NotImplemented
+
+	def find_playlist(self, **kwargs) -> Optional[plexapi.playlist.Playlist]:
+		"""
+
+		:param kwargs:
+			See below
+
+		:keyword Arguments:
+			* *title* (``str``) -- Playlist name
+
+		:return: a list of matching playlists
+		:rtype: list<Playlist>
+		"""
+		title = kwargs['title']
+		try:
+			return self.plex_api_connection.playlist(title)
+		except NotFound:
+			self.logger.debug('Playlist {} not found on the remote player'.format(title))
+			return None
 
 	def search_tracks(self, **kwargs):
 		"""
@@ -185,13 +281,28 @@ class PlexPlayer(MediaPlayer):
 		:keyword Arguments:
 			* *title* (``str``) -- Track title
 
-		:returns a list of matching tracks
+		:return: a list of matching tracks
+		:rtype: list<plexapi.audio.Track>
 		"""
 		title = kwargs['title']
 		matches = self.music_library.searchTracks(title=title)
 		n_matches = len(matches)
 		self.logger.debug('Found {} match{} for query title={}'.format(n_matches, 'es' if n_matches > 1 else '', title))
 		return matches
+
+	def update_playlist(self, playlist, track, present):
+		"""
+		:type playlist: plexapi.playlist.Playlist
+		:type track: plexapi.audio.Track
+		:type present: bool
+		:return:
+		"""
+		if present:
+			self.logger.debug('Adding {} to playlist {}'.format(format_plexapi_track(track), playlist.title))
+			if not self.dry_run: playlist.addItems(track)
+		else:
+			self.logger.debug('Removing {} from playlist {}'.format(format_plexapi_track(track), playlist.title))
+			if not self.dry_run: playlist.removeItem(track)
 
 	def update_rating(self, track, rating):
 		self.logger.debug('Updating rating of track "{}" to {} stars'.format(
