@@ -38,6 +38,7 @@ These are a few ideas I have for features that would make sense:
 * setup routine
 * bi-directional sync
 * optionally only synchronize track ratings _or_ playlists
+* parallelization
 * better user-interaction with nicer dialogs
 * cache synchronization conflicts to prompt the user at the end of the batch run to resolve them
 * iTunes synchronization?
