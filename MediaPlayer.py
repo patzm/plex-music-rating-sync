@@ -247,7 +247,9 @@ class PlexPlayer(MediaPlayer):
 		if self.dry_run:
 			return None
 		else:
-			assert tracks is not None and len(tracks)
+			if tracks is not None and len(tracks):
+				self.logger.warning('Playlist {} can not be created without supplying at least one track. Skipping.'.format(title))
+				return None
 			return self.plex_api_connection.createPlaylist(title=title, items=tracks)
 
 	def read_playlists(self):
