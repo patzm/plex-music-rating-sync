@@ -124,7 +124,7 @@ class PlexSync:
 def parse_args():
 	parser = argparse.ArgumentParser(description='Synchronizes ID3 music ratings with a Plex media-server')
 	parser.add_argument('--dry', action='store_true', help='Does not apply any changes')
-	parser.add_argument('--log', default='warning', help='Sets the logging level')
+	parser.add_argument('--log', default='info', help='Sets the logging level')
 	parser.add_argument('--passwd', type=str, help='The password for the plex user. NOT RECOMMENDED TO USE!')
 	parser.add_argument('--player', type=str, required=True, help='Media player to synchronize with Plex')
 	parser.add_argument('--server', type=str, required=True, help='The name of the plex media server')
