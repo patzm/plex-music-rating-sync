@@ -8,5 +8,5 @@ class AudioTag(object):
 		self.title = title
 
 	def __str__(self):
-		sep = ' - '
-		return self.artist + sep + self.album + sep + self.title
+		return ' - '.join([self.artist, self.album, self.title])
+
