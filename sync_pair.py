@@ -5,7 +5,8 @@ import logging
 import numpy as np
 from plexapi.audio import Track
 
-from sync_items import AudioTag
+import MediaPlayer
+from sync_items import AudioTag, Playlist
 from utils import *
 
 
@@ -24,6 +25,10 @@ class SyncPair(abc.ABC):
 	sync_state = SyncState.UNKNOWN
 
 	def __init__(self, local_player, remote_player):
+		"""
+		:type local_player: MediaPlayer.MediaPlayer
+		:type remote_player: MediaPlayer.PlexPlayer
+		"""
 		self.local_player = local_player
 		self.remote_player = remote_player
 
@@ -41,7 +46,11 @@ class SyncPair(abc.ABC):
 
 	@abc.abstractmethod
 	def sync(self):
-		"""Synchronizes the local and remote replicas"""
+		"""
+		Synchronizes the local and remote replicas
+		:return flag indicating success
+		:rtype: bool
+		"""
 
 
 class TrackPair(SyncPair):
@@ -50,9 +59,8 @@ class TrackPair(SyncPair):
 
 	def __init__(self, local_player, remote_player, local_track):
 		"""
-
-		:type local_player: MediaPlayer
-		:type remote_player: PlexPlayer
+		:type local_player: MediaPlayer.MediaPlayer
+		:type remote_player: MediaPlayer.PlexPlayer
 		:type local_track: AudioTag
 		"""
 		super(TrackPair, self).__init__(local_player, remote_player)
@@ -66,7 +74,7 @@ class TrackPair(SyncPair):
 		:type remote: str
 			 optional album title to compare the album name of the local track with
 		:returns a similarity rating [0, 100]
-		:rtype int
+		:rtype: int
 		"""
 		if remote is None:
 			remote = self.remote
@@ -95,6 +103,7 @@ class TrackPair(SyncPair):
 		))
 
 		self.rating_local = self.local.rating
+		# TODO: use public accessor method, once PR-263 gets merged: https://github.com/pkkid/python-plexapi/pull/263
 		self.rating_remote = self.remote_player.get_normed_rating(float(self.remote._data.attrib['userRating'])) \
 			if 'userRating' in self.remote._data.attrib \
 			else 0
@@ -116,7 +125,7 @@ class TrackPair(SyncPair):
 		Determines the matching similarity of @candidate with the local query track
 		:type candidate: Track
 		:returns a similarity rating [0.0, 100.0]
-		:rtype float
+		:rtype: float
 		"""
 		scores = np.array([fuzz.ratio(self.local.title, candidate.title),
 		                   fuzz.ratio(self.local.artist, candidate.artist().title),
@@ -134,6 +143,12 @@ class TrackPair(SyncPair):
 
 class PlaylistPair(SyncPair):
 	def __init__(self, local_player, remote_player):
+	remote: [Playlist]
+
+		"""
+		:type local_player: MediaPlayer.MediaPlayer
+		:type remote_player: MediaPlayer.PlexPlayer
+		"""
 		super(PlaylistPair, self).__init__(local_player, remote_player)
 		self.logger = logging.getLogger('PlexSync.TrackPair')
 
