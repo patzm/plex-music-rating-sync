@@ -5,7 +5,7 @@ import logging
 import numpy as np
 from plexapi.audio import Track
 
-from AudioTag import AudioTag
+from sync_items import AudioTag
 from utils import *
 
 

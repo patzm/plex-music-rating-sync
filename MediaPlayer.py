@@ -5,7 +5,7 @@ from plexapi.exceptions import BadRequest, NotFound
 from plexapi.myplex import MyPlexAccount
 import time
 
-from AudioTag import AudioTag
+from sync_items import AudioTag
 from utils import *
 
 
