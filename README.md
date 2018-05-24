@@ -16,14 +16,42 @@ This project aims to provide a simple sync tool that synchronizes the track rati
 * Windows
 * [MediaMonkey](http://www.mediamonkey.com/) v4.0 or higher
 *  _Plex Media Server_ (PMS)
-* Python 3.5 with packages:
-    * [PlexAPI](https://pypi.org/project/PlexAPI/)
+* Python 3.6 or higher with packages:
+    * [PlexAPI v3.0.6](https://pypi.org/project/PlexAPI/)
     * [pypiwin32](https://pypi.org/project/pypiwin32/): to use the COM interface
     * [fuzzywuzzy](https://github.com/seatgeek/fuzzywuzzy): for fuzzy string matching
     * [python-Levenshtein](https://github.com/miohtama/python-Levenshtein) (optional): to improve performance of `fuzzywuzzy`
+    * [numpy](https://pypi.org/project/numpy/)
 
 ## Installation
-`To be done`
+
+1. Clone this repository
+   `git clone git@github.com:patzm/plex-music-rating-sync.git`
+2. `cd plex-music-rating-sync`
+3. Install all requirements
+   `pip3.6 install -r requirements.txt`
+
+## How to run
+The main file is `sync_ratings.py`.
+Usage description:
+```
+usage: sync_ratings.py [-h] [--dry] [--log LOG] [--passwd PASSWD] --player
+                       PLAYER --server SERVER --username USERNAME
+
+Synchronizes ID3 music ratings with a Plex media-server
+
+optional arguments:
+  -h, --help           show this help message and exit
+  --dry                Does not apply any changes
+  --log LOG            Sets the logging level
+  --passwd PASSWD      The password for the plex user. NOT RECOMMENDED TO USE!
+  --player PLAYER      Media player to synchronize with Plex
+  --server SERVER      The name of the plex media server
+  --username USERNAME  The plex username
+```
+Start the synchronization:
+`./sync_ratings.py --server <server_name> --username <my@email.com|user_name> --player MediaMonkey`
+Using the `--dry` flag in combination with `--log DEBUG` is recommended to see what changes will be made.
 
 ## Current Issues
 * the [PlexAPI](https://pypi.org/project/PlexAPI/) seems to be only working for the administrator of the PMS.
@@ -34,7 +62,8 @@ Consequently I will not continue development unless you request it.
 I welcome anyone to join the development of this little cmd-line tool.
 Just open a [new issue](https://github.com/patzm/plex-music-rating-sync/issues/new), post a pull request, or ask me to give you permissions for the repository itself. 
 
-These are a few ideas I have for features that would make sense: 
+These are a few ideas I have for features that would make sense:
+
 * setup routine
 * bi-directional sync
 * optionally only synchronize track ratings _or_ playlists
