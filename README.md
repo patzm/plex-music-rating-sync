@@ -53,12 +53,12 @@ Start the synchronization:
 `./sync_ratings.py --server <server_name> --username <my@email.com|user_name> --player MediaMonkey`
 Using the `--dry` flag in combination with `--log DEBUG` is recommended to see what changes will be made.
 
-## Current Issues
+## Current issues
 * the [PlexAPI](https://pypi.org/project/PlexAPI/) seems to be only working for the administrator of the PMS.
 
-## Upcoming Features
+## Potential next features
 With the current state I have completed all functionality I desired to have.
-Consequently I will not continue development unless you request it.
+Consequently I will *not* continue development unless you request it.
 I welcome anyone to join the development of this little cmd-line tool.
 Just open a [new issue](https://github.com/patzm/plex-music-rating-sync/issues/new), post a pull request, or ask me to give you permissions for the repository itself. 
 
