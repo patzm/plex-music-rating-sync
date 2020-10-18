@@ -31,7 +31,7 @@ class MediaPlayer(abc.ABC):
 		if not isinstance(album, str): return False
 		return album == self.album_empty_alias
 
-	def connect(self, *args):
+	def connect(self, *args, **kwargs):
 		return NotImplemented
 
 	@abc.abstractmethod
@@ -193,10 +193,8 @@ class PlexPlayer(MediaPlayer):
 	def name():
 		return 'PlexPlayer'
 
-	def connect(self, *args, password=''):
-		server = args[0]
-		username = args[1]
-		self.logger.info(f'Connecting to the Plex Server {server} with username {username}')
+	def connect(self, server, username, password=''):
+		self.logger.info(f'Connecting to the Plex Server {server} with username {username}.')
 		connection_attempts_left = self.maximum_connection_attempts
 		while connection_attempts_left > 0:
 			time.sleep(1)  # important. Otherwise, the above print statement can be flushed after

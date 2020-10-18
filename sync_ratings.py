@@ -92,7 +92,11 @@ class PlexSync:
 
 	def sync(self):
 		self.local_player.connect()
-		self.remote_player.connect(self.options.server, self.options.username, password=self.options.passwd)
+		self.remote_player.connect(
+			server=self.options.server,
+			username=self.options.username,
+			password=self.options.passwd,
+		)
 		self.sync_tracks()
 		self.sync_playlists()
 
