@@ -196,7 +196,7 @@ class PlexPlayer(MediaPlayer):
 	def connect(self, *args, password=''):
 		server = args[0]
 		username = args[1]
-		self.logger.info('Connecting to the Plex with username "{}"'.format(server, username))
+		self.logger.info(f'Connecting to the Plex Server {server} with username {username}')
 		connection_attempts_left = self.maximum_connection_attempts
 		while connection_attempts_left > 0:
 			time.sleep(1)  # important. Otherwise, the above print statement can be flushed after
@@ -206,7 +206,7 @@ class PlexPlayer(MediaPlayer):
 				self.account = MyPlexAccount(username, password)
 				break
 			except NotFound:
-				print('Username or password wrong'.format(server))
+				print(f'Username {username} or password wrong for server {server}.')
 				password = ''
 				connection_attempts_left -= 1
 			except BadRequest as error:
