@@ -173,7 +173,7 @@ class TrackPair(SyncPair):
 
 	def sync(self):
 		#change everything to source/destination
-		if self.rating_source == 0.0:
+		if self.rating_destination <= 0.0:
 			# Propagate the rating of the remote track to the local track
 			self.destination_player.update_rating(self.destination, self.rating_source)
 		else:

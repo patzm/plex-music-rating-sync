@@ -35,8 +35,8 @@ This project aims to provide a simple sync tool that synchronizes the track rati
 The main file is `sync_ratings.py`.
 Usage description:
 ```
-usage: sync_ratings.py [-h] [--dry] [--log LOG] [--passwd PASSWD] --player
-                       PLAYER --server SERVER --username USERNAME
+usage: sync_ratings.py [-h] [--dry] [--log LOG] [--passwd PASSWD] 
+                       [--player PLAYER] --server SERVER --username USERNAME
 
 Synchronizes ID3 music ratings with a Plex media-server
 
@@ -45,12 +45,12 @@ optional arguments:
   --dry                Does not apply any changes
   --log LOG            Sets the logging level
   --passwd PASSWD      The password for the plex user. NOT RECOMMENDED TO USE!
-  --player PLAYER      Media player to synchronize with Plex
+  --player PLAYER      Media player to synchronize with Plex [default is MediaMonkey]
   --server SERVER      The name of the plex media server
   --username USERNAME  The plex username
 ```
 Start the synchronization:
-`./sync_ratings.py --server <server_name> --username <my@email.com|user_name> --player MediaMonkey`
+`./sync_ratings.py --server <server_name> --username <my@email.com|user_name>`
 Using the `--dry` flag in combination with `--log DEBUG` is recommended to see what changes will be made.
 
 ## Current issues

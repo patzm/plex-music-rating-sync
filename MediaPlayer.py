@@ -170,8 +170,9 @@ class MediaMonkey(MediaPlayer):
 			tags.append(self.read_track_metadata(it.Item))
 			counter += 1
 			it.Next()
-
-		self.logger.info('Read {} tracks with a rating > 0'.format(counter))
+			
+		if "rating" in query:
+			self.logger.info('Read {} tracks with a rating > 0'.format(counter))
 		return tags
 
 	def update_playlist(self, playlist, track, present):
@@ -181,7 +182,9 @@ class MediaMonkey(MediaPlayer):
 		self.logger.debug('Updating rating of track "{}" to {} stars'.format(
 			format_mediamonkey_track(track), self.get_5star_rating(rating))
 		)
-		if not self.dry_run: self.sdb.Database.QuerySongs('ID='+str(track.ID)).Item.Rating=self.get_native_rating(rating)
+		if not self.dry_run: 
+			song = self.sdb.Database.QuerySongs('ID='+str(track.ID))
+			song.Item.Rating = self.get_native_rating(rating)
 
 class PlexPlayer(MediaPlayer):
 #TODO logging needs to be updated to reflect whether Plex is source or destination
