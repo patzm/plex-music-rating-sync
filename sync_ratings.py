@@ -103,9 +103,11 @@ class PlexSync:
 	def sync_tracks(self):
 		if self.options.reverse:
 			tracks = self.remote_player.search_tracks(rating=True)
+			self.logger.info('Attempting to match {} tracks'.format(len(tracks)))
 			sync_pairs = [TrackPair(self.remote_player, self.local_player, track) for track in tracks]
 		else:
 			tracks = self.local_player.search_tracks(query='Rating > 0')
+			self.logger.info('Attempting to match {} tracks'.format(len(tracks)))
 			sync_pairs = [TrackPair(self.local_player, self.remote_player, track) for track in tracks]
 
 		self.logger.info('Matching source tracks with destination player')

@@ -134,9 +134,9 @@ class TrackPair(SyncPair):
 
 		self.rating_source = self.source.rating
 		if self.destination_player.name()=="PlexPlayer": 
-			self.rating_destination = self.destination_player.get_normed_rating(float(self.destination.userRating)) 				if 'userRating' in self.destination.userRating 				else 0
+			self.rating_destination = self.destination.userRating
 		else:
-			self.rating_destination = self.destination_player.get_normed_rating(float(self.destination.rating))
+			self.rating_destination = self.destination.rating
 
 		if self.rating_source == self.rating_destination:
 			self.sync_state = SyncState.UP_TO_DATE
@@ -144,8 +144,8 @@ class TrackPair(SyncPair):
 			self.sync_state = SyncState.NEEDS_UPDATE
 		elif self.rating_source != self.rating_destination:
 			self.sync_state = SyncState.CONFLICTING
-			self.logger.warning('Found match with conflicting ratings: {}'.format(
-				self.source)
+			self.logger.warning('Found match with conflicting ratings: {} (Source: {} | Destination; {})'.format(
+				self.source, self.rating_source, self.rating_destination)
 			)
 
 		return score
