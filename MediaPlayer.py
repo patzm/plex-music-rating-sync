@@ -11,10 +11,10 @@ from typing import List, Optional
 from sync_items import AudioTag, Playlist
 from utils import *
 
-
 class MediaPlayer(abc.ABC):
 	album_empty_alias = ''
 	dry_run = False
+	reverse = False
 	rating_maximum = 5
 
 	@staticmethod
@@ -92,8 +92,8 @@ class MediaPlayer(abc.ABC):
 		if not isinstance(other, type(self)): return NotImplemented
 		return other.name().lower() == self.name().lower()
 
-
 class MediaMonkey(MediaPlayer):
+#TODO logging needs to be updated to reflect whether MediaMonkey is source or destination
 	rating_maximum = 100
 
 	def __init__(self):
@@ -152,12 +152,16 @@ class MediaMonkey(MediaPlayer):
 
 	def read_track_metadata(self, track):
 		tag = AudioTag(track.Artist.Name, track.Album.Name, track.Title)
-		tag.rating = self.get_normed_rating(track.Rating)
+		if track.Rating <0: 
+			tag.rating=0
+		else:
+			tag.rating = self.get_normed_rating(track.Rating)
+		tag.ID = track.ID
 		return tag
 
 	def search_tracks(self, **kwargs):
-		self.logger.info('Reading tracks from the {} player'.format(self.name()))
-
+		if not self.reverse:
+			self.logger.info('Reading tracks from the {} player'.format(self.name()))
 		query = kwargs['query']
 		it = self.sdb.Database.QuerySongs(query)
 		tags = []
@@ -167,17 +171,20 @@ class MediaMonkey(MediaPlayer):
 			counter += 1
 			it.Next()
 
-		self.logger.info('Read {} tracks with a rating > 0'.format(counter + 1))
+		self.logger.info('Read {} tracks with a rating > 0'.format(counter))
 		return tags
 
 	def update_playlist(self, playlist, track, present):
 		raise NotImplementedError
 
 	def update_rating(self, track, rating):
-		raise NotImplementedError
-
+		self.logger.debug('Updating rating of track "{}" to {} stars'.format(
+			format_mediamonkey_track(track), self.get_5star_rating(rating))
+		)
+		if not self.dry_run: self.sdb.Database.QuerySongs('ID='+str(track.ID)).Item.Rating=self.get_native_rating(rating)
 
 class PlexPlayer(MediaPlayer):
+#TODO logging needs to be updated to reflect whether Plex is source or destination
 	maximum_connection_attempts = 3
 	rating_maximum = 10
 	album_empty_alias = '[Unknown Album]'
@@ -240,6 +247,11 @@ class PlexPlayer(MediaPlayer):
 			choice = input('Select the library to sync with: ')
 			self.music_library = music_libraries[choice]
 
+	def read_track_metadata(self, track):
+		tag = AudioTag(track.grandparentTitle, track.parentTitle, track.title)
+		tag.rating = self.get_normed_rating(track.userRating)
+		return tag
+
 	def create_playlist(self, title, tracks: List[plexapi.audio.Track]) -> Optional[plexapi.playlist.Playlist]:
 		self.logger.info('Creating playlist {} on the server'.format(title))
 		if self.dry_run:
@@ -271,7 +283,7 @@ class PlexPlayer(MediaPlayer):
 		except NotFound:
 			self.logger.debug('Playlist {} not found on the remote player'.format(title))
 			return None
-
+    
 	def search_tracks(self, **kwargs):
 		"""
 		Searches the PMS music library for tracks matching the artist and track title
@@ -284,10 +296,21 @@ class PlexPlayer(MediaPlayer):
 		:return: a list of matching tracks
 		:rtype: list<plexapi.audio.Track>
 		"""
-		title = kwargs['title']
-		matches = self.music_library.searchTracks(title=title)
-		n_matches = len(matches)
-		self.logger.debug('Found {} match{} for query title={}'.format(n_matches, 'es' if n_matches > 1 else '', title))
+		title = kwargs.get('title')
+		rating = kwargs.get('rating')
+		if title: 
+			matches = self.music_library.searchTracks(title=title)
+			n_matches = len(matches)
+			self.logger.debug('Found {} match{} for query title={}'.format(n_matches, 'es' if n_matches > 1 else '', title))
+		if rating:
+			matches = self.music_library.searchTracks(**{'track.userRating!':'0'})
+			tags = []
+			counter = 0
+			for x in matches:
+				tags.append(self.read_track_metadata(x))
+				counter += 1
+			self.logger.info('Read {} tracks with a rating > 0'.format(counter))
+			matches=tags
 		return matches
 
 	def update_playlist(self, playlist, track, present):
