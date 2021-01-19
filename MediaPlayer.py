@@ -185,6 +185,7 @@ class MediaMonkey(MediaPlayer):
 		if not self.dry_run: 
 			song = self.sdb.Database.QuerySongs('ID='+str(track.ID))
 			song.Item.Rating = self.get_native_rating(rating)
+			song.Item.UpdateDB()
 
 class PlexPlayer(MediaPlayer):
 #TODO logging needs to be updated to reflect whether Plex is source or destination
