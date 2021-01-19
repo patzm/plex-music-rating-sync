@@ -152,8 +152,8 @@ def parse_args():
 	parser.add_argument('--log', default='debug', help='Sets the logging level')
 	parser.add_argument('--passwd', type=str, help='The password for the plex user. NOT RECOMMENDED TO USE!')
 	parser.add_argument('--player', default='MediaMonkey', type=str, help='Media player to synchronize with Plex')
-	parser.add_argument('--server', required=True, type=str,  help='The name of the plex media server')
-	parser.add_argument('--username', required=True, type=str, help='The plex username')
+	parser.add_argument('--server', type=str, required=True, help='The name of the plex media server')
+	parser.add_argument('--username', type=str, required=True, help='The plex username')
 
 	return parser.parse_args()
 
