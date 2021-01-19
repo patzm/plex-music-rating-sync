@@ -100,7 +100,7 @@ class PlexSync:
 			username=self.options.username,
 			password=self.options.passwd,
 		)
-		if not "playlists" in self.options.sync:
+		if "playlists" not in self.options.sync:
 			self.sync_tracks()
 		#TODO: finish implementing playlist sync for MediaMonkey -> Plex
 		if not "tracks"  in self.options.sync:
