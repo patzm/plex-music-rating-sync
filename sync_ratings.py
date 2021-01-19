@@ -91,7 +91,7 @@ class PlexSync:
 			self.logger.addHandler(ch_std)
 
 	def sync(self):
-		if self.options.sync not in ["both", "tracks","playlists"]:
+		if self.options.sync.lower() not in ["both", "tracks","playlists"]:
 			raise RuntimeError('Invalid sync item selected: {}'.format(self.options.sync))
 			
 		self.local_player.connect()
