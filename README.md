@@ -44,7 +44,7 @@ optional arguments:
   -h, --help           show this help message and exit
   --dry                Does not apply any changes
   --reverse            Reverses ratings synchronization from Plex to local player 
-  --sync 			   Selects which items to sync: TRACKS, PLAYLISTS, or BOTH [default is TRACKS]
+  --sync               Selects which items to sync: TRACKS, PLAYLISTS, or BOTH [default is TRACKS]
   --log LOG            Sets the logging level
   --passwd PASSWD      The password for the plex user. NOT RECOMMENDED TO USE!
   --player PLAYER      Media player to synchronize with Plex [default is MediaMonkey]
