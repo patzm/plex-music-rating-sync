@@ -103,7 +103,7 @@ class PlexSync:
 		if "playlists" not in self.options.sync:
 			self.sync_tracks()
 		#TODO: finish implementing playlist sync for MediaMonkey -> Plex
-		if not "tracks"  in self.options.sync:
+		if "tracks" not in self.options.sync:
 			if not self.options.reverse:
 				self.sync_playlists()
         
