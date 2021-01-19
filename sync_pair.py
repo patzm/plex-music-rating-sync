@@ -19,21 +19,22 @@ class SyncState(Enum):
 
 
 class SyncPair(abc.ABC):
-	local = None
-	remote = None
+	source = None
+	destination = None
 	sync_state = SyncState.UNKNOWN
 
-	def __init__(self, local_player, remote_player):
-		"""
-		:type local_player: MediaPlayer.MediaPlayer
-		:type remote_player: MediaPlayer.PlexPlayer
-		"""
-		self.local_player = local_player
-		self.remote_player = remote_player
+	def __init__(self, source_player, destination_player):
+		#"""
+		#TODO: this is no longer true - not sure if it matters
+		#:type local_player: MediaPlayer.MediaPlayer
+		#:type remote_player: MediaPlayer.PlexPlayer
+		#"""
+		self.source_player = source_player
+		self.destination_player = destination_player
 
 	@abc.abstractmethod
 	def match(self):
-		"""Tries to find a match on the remote player that matches the local replica as good as possible"""
+		"""Tries to find a match on the destination player that matches the source replica as good as possible"""
 
 	@abc.abstractmethod
 	def resolve_conflict(self):
@@ -41,58 +42,74 @@ class SyncPair(abc.ABC):
 
 	@abc.abstractmethod
 	def similarity(self, candidate):
-		"""Determines the similarity of the local replica with the candidate replica"""
+		"""Determines the similarity of the source replica with the candidate replica"""
 
 	@abc.abstractmethod
 	def sync(self):
 		"""
-		Synchronizes the local and remote replicas
+		Synchronizes the source and destination replicas
 		:return flag indicating success
 		:rtype: bool
 		"""
 
-
 class TrackPair(SyncPair):
-	rating_local = 0.0
-	rating_remote = 0.0
+	rating_source = 0.0
+	rating_destination = 0.0
 
-	def __init__(self, local_player, remote_player, local_track):
-		"""
-		:type local_player: MediaPlayer.MediaPlayer
-		:type remote_player: MediaPlayer.PlexPlayer
-		:type local_track: AudioTag
-		"""
-		super(TrackPair, self).__init__(local_player, remote_player)
+	def __init__(self, source_player, destination_player, source_track):
+		#"""
+		#TODO: this is no longer true - not sure if it matters
+		#:type local_player: MediaPlayer.MediaPlayer
+		#:type remote_player: MediaPlayer.PlexPlayer
+		#"""
+		super(TrackPair, self).__init__(source_player, destination_player)
 		self.logger = logging.getLogger('PlexSync.TrackPair')
-		self.local = local_track
+		self.source = source_track
 
-	def albums_similarity(self, remote=None):
+	def albums_similarity(self, destination=None):
 		"""
 		Determines how similar two album names are. It takes into account different conventions for empty album names.
-
-		:type remote: str
-			 optional album title to compare the album name of the local track with
+		:type destination: str
+			 optional album title to compare the album name of the source track with
 		:returns a similarity rating [0, 100]
 		:rtype: int
 		"""
-		if remote is None:
-			remote = self.remote
-		if self.both_albums_empty(remote=remote):
+		if destination is None:
+			destination = self.destination
+		if self.both_albums_empty(destination=destination):
 			return 100
 		else:
-			return fuzz.ratio(self.local.album, remote.album().title)
+			if self.destination_player.name()=="PlexPlayer":            
+				return fuzz.ratio(self.source.album, destination.album().title)
+			else:
+				return fuzz.ratio(self.source.album, destination.album)
 
-	def both_albums_empty(self, remote=None):
-		if remote is None: remote = self.remote
-		return self.local_player.album_empty(self.local.album) and self.remote_player.album_empty(remote.album().title)
+	def both_albums_empty(self, destination=None):
+		if destination is None: destination = self.destination
+		if self.destination_player.name()=="PlexPlayer":   
+			return self.source_player.album_empty(self.source.album) and self.destination_player.album_empty(destination.album().title)
+		else:
+			return self.source_player.album_empty(self.source.album) and self.destination_player.album_empty(destination.album)
 
 	def match(self, candidates=None, match_threshold=30):
-		if self.local is None: raise RuntimeError('Local track not set')
+		if self.source is None: raise RuntimeError('Source track not set')
 		if candidates is None:
-			candidates = self.remote_player.search_tracks(title=self.local.title)
+			if self.destination_player.name()=="PlexPlayer":  
+				candidates = self.destination_player.search_tracks(title=self.source.title)
+			else:
+				title=self.source.title
+				if "\"" in title:
+					part_len=0
+					title_parts = title.split("\"")
+					for index,part in enumerate(title_parts):
+						if len(part) > part_len: 
+							part_len = len(part)
+							long_part=index
+					title=title_parts[long_part]
+				candidates = self.destination_player.search_tracks(query="SongTitle like \"%"+ title +"%\"")
 		if len(candidates) == 0:
 			self.sync_state = SyncState.ERROR
-			self.logger.warning('No match found for {}'.format(self.local))
+			self.logger.warning('No match found for {}'.format(self.source))
 			return 0
 		scores = np.array([self.similarity(candidate) for candidate in candidates])
 		ranks = scores.argsort()
@@ -104,23 +121,32 @@ class TrackPair(SyncPair):
 			))
 			return score
 
-		self.remote = candidates[ranks[-1]]
-		self.logger.debug('Found match with score {} for {}: {}'.format(
-			score, self.local, format_plexapi_track(self.remote)
-		))
+		self.destination = candidates[ranks[-1]]
+		if self.destination_player.name()=="PlexPlayer": 
+			self.logger.debug('Found match with score {} for {}: {}'.format(
+				score, self.source, format_plexapi_track(self.destination)
+			))
+		else:
+			#TODO: this needs generized to handle multiple local players
+			self.logger.debug('Found match with score {} for {}: {}'.format(
+				score, self.source, format_mediamonkey_track(self.destination)
+			))
 
-		self.rating_local = self.local.rating
-		# TODO: use public accessor method, once PR-263 gets merged: https://github.com/pkkid/python-plexapi/pull/263
-		self.rating_remote = self.remote_player.get_normed_rating(float(self.remote._data.attrib['userRating'])) \
-			if 'userRating' in self.remote._data.attrib \
-			else 0
+		self.rating_source = self.source.rating
+		if self.destination_player.name()=="PlexPlayer": 
+			self.rating_destination = self.destination.userRating
+		else:
+			self.rating_destination = self.destination.rating
 
-		if self.rating_local == self.rating_remote:
+		if self.rating_source == self.rating_destination:
 			self.sync_state = SyncState.UP_TO_DATE
-		elif self.rating_local == 0.0 or self.rating_remote == 0.0:
+		elif self.rating_source == 0.0 or self.rating_destination == 0.0:
 			self.sync_state = SyncState.NEEDS_UPDATE
-		elif self.rating_local != self.rating_remote:
+		elif self.rating_source != self.rating_destination:
 			self.sync_state = SyncState.CONFLICTING
+			self.logger.warning('Found match with conflicting ratings: {} (Source: {} | Destination; {})'.format(
+				self.source, self.rating_source, self.rating_destination)
+			)
 
 		return score
 
@@ -129,29 +155,33 @@ class TrackPair(SyncPair):
 
 	def similarity(self, candidate):
 		"""
-		Determines the matching similarity of @candidate with the local query track
+		Determines the matching similarity of @candidate with the source query track
 		:type candidate: Track
 		:returns a similarity rating [0.0, 100.0]
 		:rtype: float
 		"""
-		scores = np.array([fuzz.ratio(self.local.title, candidate.title),
-		                   fuzz.ratio(self.local.artist, candidate.artist().title),
-		                   self.albums_similarity(remote=candidate)])
+		if self.destination_player.name()=="PlexPlayer": 
+			scores = np.array([fuzz.ratio(self.source.title, candidate.title),
+			                   fuzz.ratio(self.source.artist, candidate.artist().title),
+			                   self.albums_similarity(destination=candidate)])
+		else:
+			scores = np.array([fuzz.ratio(self.source.title, candidate.title),
+			                   fuzz.ratio(self.source.artist, candidate.artist),
+			                   self.albums_similarity(destination=candidate)])  
 		return np.average(scores)
 
 	def sync(self):
-		if self.rating_local == 0.0:
+		#change everything to source/destination
+		if self.rating_destination <= 0.0:
 			# Propagate the rating of the remote track to the local track
-			self.local_player.update_rating(self.local, self.rating_remote)
-		elif self.rating_remote == 0.0:
-			# Propagate the rating of the local track to the remote track
-			self.remote_player.update_rating(self.remote, self.rating_local)
+			self.destination_player.update_rating(self.destination, self.rating_source)
 		else:
 			return False
 		return True
 
 
 class PlaylistPair(SyncPair):
+	#TODO: finish implementing playlist sync for MediaMonkey -> Plexfo
 	remote: [Playlist]
 
 	def __init__(self, local_player, remote_player, local_playlist):
@@ -199,3 +229,4 @@ class PlaylistPair(SyncPair):
 					self.remote_player.update_playlist(self.remote, pair.remote, True)
 
 		return True
+

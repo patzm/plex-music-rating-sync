@@ -13,7 +13,6 @@ class InfoFilter(logging.Filter):
 	def filter(self, rec):
 		return rec.levelno in (logging.DEBUG, logging.INFO)
 
-
 class PlexSync:
 	log_levels = {
 		'CRITICAL': logging.CRITICAL,
@@ -23,13 +22,14 @@ class PlexSync:
 		'DEBUG': logging.DEBUG
 	}
 
-	def __init__(self, options):
+	def __init__(self, options):   
 		self.logger = logging.getLogger('PlexSync')
 		self.options = options
 		self.setup_logging()
 		self.local_player = self.get_player()
 		self.remote_player = PlexPlayer()
 		self.local_player.dry_run = self.remote_player.dry_run = self.options.dry
+		self.local_player.reverse = self.remote_player.reverse = self.options.reverse
 
 	def get_player(self):
 		"""
@@ -98,13 +98,21 @@ class PlexSync:
 			password=self.options.passwd,
 		)
 		self.sync_tracks()
-		self.sync_playlists()
-
+		#TODO: finish implementing playlist sync for MediaMonkey -> Plex
+		if not self.options.reverse:
+			self.sync_playlists()
+        
 	def sync_tracks(self):
-		tracks = self.local_player.search_tracks(query='Rating > 0')
-		sync_pairs = [TrackPair(self.local_player, self.remote_player, track) for track in tracks]
+		if self.options.reverse:
+			tracks = self.remote_player.search_tracks(rating=True)
+			self.logger.info('Attempting to match {} tracks'.format(len(tracks)))
+			sync_pairs = [TrackPair(self.remote_player, self.local_player, track) for track in tracks]
+		else:
+			tracks = self.local_player.search_tracks(query='Rating > 0')
+			self.logger.info('Attempting to match {} tracks'.format(len(tracks)))
+			sync_pairs = [TrackPair(self.local_player, self.remote_player, track) for track in tracks]
 
-		self.logger.info('Matching local tracks with remote player')
+		self.logger.info('Matching source tracks with destination player')
 		matched = 0
 		for pair in sync_pairs:
 			if pair.match(): matched += 1
@@ -122,6 +130,8 @@ class PlexSync:
 			pair.resolve_conflict()
 
 	def sync_playlists(self):
+		if self.options.reverse:
+			raise NotImplementedError
 		playlists = self.local_player.read_playlists()
 		playlist_pairs = [PlaylistPair(self.local_player, self.remote_player, pl)
 		                  for pl in playlists if not pl.is_auto_playlist]
@@ -140,12 +150,15 @@ class PlexSync:
 def parse_args():
 	parser = argparse.ArgumentParser(description='Synchronizes ID3 music ratings with a Plex media-server')
 	parser.add_argument('--dry', action='store_true', help='Does not apply any changes')
-	parser.add_argument('--log', default='info', help='Sets the logging level')
+	parser.add_argument('--reverse', action='store_true', help='Syncs ratings from Plex to local player')
+	parser.add_argument('--log', default='debug', help='Sets the logging level')
 	parser.add_argument('--passwd', type=str, help='The password for the plex user. NOT RECOMMENDED TO USE!')
-	parser.add_argument('--player', type=str, required=True, help='Media player to synchronize with Plex')
+	parser.add_argument('--player', default='MediaMonkey', type=str, help='Media player to synchronize with Plex')
 	parser.add_argument('--server', type=str, required=True, help='The name of the plex media server')
 	parser.add_argument('--username', type=str, required=True, help='The plex username')
+
 	return parser.parse_args()
+
 
 
 if __name__ == "__main__":

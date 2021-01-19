@@ -35,3 +35,4 @@ class Playlist(object):
 
 	def __str__(self):
 		return '{}: {} tracks'.format(self.name, self.num_tracks)
+
