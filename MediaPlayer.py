@@ -48,6 +48,7 @@ class MediaPlayer(abc.ABC):
 		return normed_rating * self.rating_maximum
 
 	def get_normed_rating(self, rating):
+		if rating <0: rating = 0
 		return rating / self.rating_maximum
 
 	@abc.abstractmethod
@@ -152,10 +153,7 @@ class MediaMonkey(MediaPlayer):
 
 	def read_track_metadata(self, track):
 		tag = AudioTag(track.Artist.Name, track.Album.Name, track.Title)
-		if track.Rating <0: 
-			tag.rating=0
-		else:
-			tag.rating = self.get_normed_rating(track.Rating)
+		tag.rating = self.get_normed_rating(track.Rating)
 		tag.ID = track.ID
 		return tag
 

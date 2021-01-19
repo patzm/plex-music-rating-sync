@@ -17,7 +17,7 @@ This project aims to provide a simple sync tool that synchronizes the track rati
 * [MediaMonkey](http://www.mediamonkey.com/) v4.0 or higher
 *  _Plex Media Server_ (PMS)
 * Python 3.6 or higher with packages:
-    * [PlexAPI v3.0.6](https://pypi.org/project/PlexAPI/)
+    * [PlexAPI v4.2.0](https://pypi.org/project/PlexAPI/)
     * [pypiwin32](https://pypi.org/project/pypiwin32/): to use the COM interface
     * [fuzzywuzzy](https://github.com/seatgeek/fuzzywuzzy): for fuzzy string matching
     * [python-Levenshtein](https://github.com/miohtama/python-Levenshtein) (optional): to improve performance of `fuzzywuzzy`
@@ -56,6 +56,7 @@ Using the `--dry` flag in combination with `--log DEBUG` is recommended to see w
 
 ## Current issues
 * the [PlexAPI](https://pypi.org/project/PlexAPI/) seems to be only working for the administrator of the PMS.
+* playlist synchronization from Plex to local player not implemented
 
 ## Potential next features
 With the current state I have completed all functionality I desired to have.

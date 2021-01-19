@@ -154,7 +154,6 @@ class TrackPair(SyncPair):
 		return NotImplemented
 
 	def similarity(self, candidate):
-        ########################i'm here
 		"""
 		Determines the matching similarity of @candidate with the source query track
 		:type candidate: Track
