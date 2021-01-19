@@ -92,7 +92,7 @@ class PlexSync:
 
 	def sync(self):
 		if self.options.sync not in ["both", "tracks","playlists"]:
-			raise RuntimeError('Invalid sync item selected: {}'.format(self.options.sync ))
+			raise RuntimeError('Invalid sync item selected: {}'.format(self.options.sync))
 			
 		self.local_player.connect()
 		self.remote_player.connect(
