@@ -91,16 +91,21 @@ class PlexSync:
 			self.logger.addHandler(ch_std)
 
 	def sync(self):
+		if self.options.sync not in ["both", "tracks","playlists"]:
+			raise RuntimeError('Invalid sync item selected: {}'.format(self.options.sync ))
+			
 		self.local_player.connect()
 		self.remote_player.connect(
 			server=self.options.server,
 			username=self.options.username,
 			password=self.options.passwd,
 		)
-		self.sync_tracks()
+		if not "playlists" in self.options.sync:
+			self.sync_tracks()
 		#TODO: finish implementing playlist sync for MediaMonkey -> Plex
-		if not self.options.reverse:
-			self.sync_playlists()
+		if not "tracks"  in self.options.sync:
+			if not self.options.reverse:
+				self.sync_playlists()
         
 	def sync_tracks(self):
 		if self.options.reverse:
@@ -151,7 +156,8 @@ def parse_args():
 	parser = argparse.ArgumentParser(description='Synchronizes ID3 music ratings with a Plex media-server')
 	parser.add_argument('--dry', action='store_true', help='Does not apply any changes')
 	parser.add_argument('--reverse', action='store_true', help='Syncs ratings from Plex to local player')
-	parser.add_argument('--log', default='debug', help='Sets the logging level')
+	parser.add_argument('--sync', default='tracks', help='Selects which items to sync: TRACKS, PLAYLISTS, or BOTH')
+	parser.add_argument('--log', default='info', help='Sets the logging level')
 	parser.add_argument('--passwd', type=str, help='The password for the plex user. NOT RECOMMENDED TO USE!')
 	parser.add_argument('--player', default='MediaMonkey', type=str, help='Media player to synchronize with Plex')
 	parser.add_argument('--server', type=str, required=True, help='The name of the plex media server')

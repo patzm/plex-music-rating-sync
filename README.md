@@ -36,14 +36,15 @@ The main file is `sync_ratings.py`.
 Usage description:
 ```
 usage: sync_ratings.py [-h] [--dry] [--reverse] [--log LOG] [--passwd PASSWD] 
-                       [--player PLAYER] --server SERVER --username USERNAME
+                       [--sync ITEM] [--player PLAYER] --server SERVER --username USERNAME
 
 Synchronizes ID3 music ratings with a Plex media-server
 
 optional arguments:
   -h, --help           show this help message and exit
   --dry                Does not apply any changes
-  --reverse            Reverses ratings synchronization from Plex to local player
+  --reverse            Reverses ratings synchronization from Plex to local player 
+  --sync 			   Selects which items to sync: TRACKS, PLAYLISTS, or BOTH [default is TRACKS]
   --log LOG            Sets the logging level
   --passwd PASSWD      The password for the plex user. NOT RECOMMENDED TO USE!
   --player PLAYER      Media player to synchronize with Plex [default is MediaMonkey]
@@ -68,7 +69,6 @@ These are a few ideas I have for features that would make sense:
 
 * setup routine
 * bi-directional sync
-* optionally only synchronize track ratings _or_ playlists
 * parallelization
 * better user-interaction with nicer dialogs
 * cache synchronization conflicts to prompt the user at the end of the batch run to resolve them
