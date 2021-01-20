@@ -97,10 +97,23 @@ class PlexSync:
 			username=self.options.username,
 			password=self.options.passwd,
 		)
-		self.sync_tracks()
-		#TODO: finish implementing playlist sync for MediaMonkey -> Plex
-		if not self.options.reverse:
-			self.sync_playlists()
+		if self.options.reverse:
+			source_name = self.local_player.name()
+			destination_name = self.remote_player.name()
+		else:
+			source_name = self.remote_player.name()
+			destination_name = self.local_player.name()
+		for sync_item in self.options.sync:
+			if sync_item.lower() == "tracks":
+				self.logger.info('Starting to sync track ratings from {} to {}'.format(source_name, destination_name))
+				self.sync_tracks()
+			elif sync_item.lower() == "playlists":
+				#TODO: finish implementing playlist sync for MediaMonkey -> Plex
+				self.logger.info('Starting to sync playlists from {} to {}'.format(source_name, destination_name))
+				if not self.options.reverse:
+					self.sync_playlists()
+			else:
+				raise ValueError('Invalid sync item selected: {}'.format(sync_item))			
         
 	def sync_tracks(self):
 		if self.options.reverse:
@@ -151,7 +164,8 @@ def parse_args():
 	parser = argparse.ArgumentParser(description='Synchronizes ID3 music ratings with a Plex media-server')
 	parser.add_argument('--dry', action='store_true', help='Does not apply any changes')
 	parser.add_argument('--reverse', action='store_true', help='Syncs ratings from Plex to local player')
-	parser.add_argument('--log', default='debug', help='Sets the logging level')
+	parser.add_argument('--sync', nargs='*', default='tracks', help='Selects which items to sync: one or more of [tracks, playlists]')
+	parser.add_argument('--log', default='info', help='Sets the logging level')
 	parser.add_argument('--passwd', type=str, help='The password for the plex user. NOT RECOMMENDED TO USE!')
 	parser.add_argument('--player', default='MediaMonkey', type=str, help='Media player to synchronize with Plex')
 	parser.add_argument('--server', type=str, required=True, help='The name of the plex media server')
