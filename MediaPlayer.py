@@ -158,6 +158,17 @@ class MediaMonkey(MediaPlayer):
 		return tag
 
 	def search_tracks(self, **kwargs):
+		"""
+		Searches the MediaMonkey music library for tracks matching the artist and track title
+		:param kwargs:
+			See below
+
+		:keyword Arguments:
+			* *query* (``str``) -- MediaMonkey query string
+
+		:return: a list of matching tracks
+		:rtype: list<sync_items.AudioTag>
+		"""
 		if not self.reverse:
 			self.logger.info('Reading tracks from the {} player'.format(self.name()))
 		query = kwargs['query']
@@ -294,6 +305,7 @@ class PlexPlayer(MediaPlayer):
 
 		:keyword Arguments:
 			* *title* (``str``) -- Track title
+			* *rating* (``bool``) -- Search for tracks that have a rating
 
 		:return: a list of matching tracks
 		:rtype: list<plexapi.audio.Track>
@@ -334,3 +346,4 @@ class PlexPlayer(MediaPlayer):
 			format_plexapi_track(track), self.get_5star_rating(rating))
 		)
 		if not self.dry_run: track.edit(**{'userRating.value': self.get_native_rating(rating)})
+
