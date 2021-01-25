@@ -36,7 +36,7 @@ The main file is `sync_ratings.py`.
 Usage description:
 *Note: default values of command line arguments can be provided by editing config.ini*
 ```
-usage: sync_ratings.py [-h] [--dry] [--reverse] [--log LOG] [--passwd PASSWD] 
+usage: sync_ratings.py [-h] [--dry] [--reverse] [--log LOG] [--passwd PASSWD] [--token TOKEN]
                        [--sync ITEM] [--player PLAYER] --server SERVER --username USERNAME
 
 Synchronizes ID3 music ratings with a Plex media-server
@@ -52,6 +52,7 @@ optional arguments:
   --sync               Selects which items to sync: one or more of: tracks, playlists [default is tracks]
   --log LOG            Sets the logging level
   --passwd PASSWD      The password for the plex user. NOT RECOMMENDED TO USE!
+  --token TOKEN        Plex API token.  See https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/ for information on how to find your token
   --player PLAYER      Media player to synchronize with Plex [default is MediaMonkey]
 ```
 Start the synchronization:
