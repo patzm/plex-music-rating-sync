@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import argparse
+import configargparse
 import locale
 import logging
 import sys
@@ -161,7 +161,7 @@ class PlexSync:
 
 
 def parse_args():
-	parser = argparse.ArgumentParser(description='Synchronizes ID3 music ratings with a Plex media-server')
+	parser = configargparse.ArgumentParser(default_config_files=['./config.ini'],description='Synchronizes ID3 music ratings with a Plex media-server')
 	parser.add_argument('--dry', action='store_true', help='Does not apply any changes')
 	parser.add_argument('--reverse', action='store_true', help='Syncs ratings from Plex to local player')
 	parser.add_argument('--sync', nargs='*', default=['tracks'], help='Selects which items to sync: one or more of [tracks, playlists]')
@@ -170,6 +170,7 @@ def parse_args():
 	parser.add_argument('--player', default='MediaMonkey', type=str, help='Media player to synchronize with Plex')
 	parser.add_argument('--server', type=str, required=True, help='The name of the plex media server')
 	parser.add_argument('--username', type=str, required=True, help='The plex username')
+	parser.add_argument('--token', type=str, help='Plex API token.  See https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/ for information on how to find your token')
 
 	return parser.parse_args()
 

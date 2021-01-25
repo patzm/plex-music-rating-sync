@@ -2,3 +2,4 @@ PlexAPI>=4.2.0
 fuzzywuzzy
 pypiwin32
 numpy
+configargparse
