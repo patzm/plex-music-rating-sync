@@ -96,6 +96,7 @@ class PlexSync:
 			server=self.options.server,
 			username=self.options.username,
 			password=self.options.passwd,
+			token=self.options.token
 		)
 		if self.options.reverse:
 			source_name = self.local_player.name()
