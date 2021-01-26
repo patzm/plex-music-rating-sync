@@ -181,7 +181,7 @@ class MediaMonkey(MediaPlayer):
 		rating = kwargs.get('rating')
 		query = kwargs.get('query')
 		if title: 
-			query = "SongTitle like \"%"+ title +"%\""
+			query = f'SongTitle like "%{title}%"'
 		elif rating:
 			query = 'Rating > 0'
 		self.logger.debug('Executing query [{}] against {}'.format(query, self.name()))
@@ -365,4 +365,3 @@ class PlexPlayer(MediaPlayer):
 			format_plexapi_track(track), self.get_5star_rating(rating))
 		)
 		if not self.dry_run: track.edit(**{'userRating.value': self.get_native_rating(rating)})
-
