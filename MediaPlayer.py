@@ -1,3 +1,9 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[ ]:
+
+
 import abc
 import logging
 import getpass
@@ -164,14 +170,24 @@ class MediaMonkey(MediaPlayer):
 			See below
 
 		:keyword Arguments:
-			* *query* (``str``) -- MediaMonkey query string
+			* *query*  (``str``)   -- MediaMonkey query string
+			* *rating* (``bool``)  -- Search for tracks that have a rating
+			* *title*  (``str``)   -- Search by Track title
 
 		:return: a list of matching tracks
 		:rtype: list<sync_items.AudioTag>
 		"""
+		title = kwargs.get('title')
+		rating = kwargs.get('rating')
+		query = kwargs.get('query')
+		if title: 
+			query = "SongTitle like \"%"+ title +"%\""
+		elif rating:
+			query = 'Rating > 0'
+		self.logger.debug('Executing query [{}] against {}'.format(query, self.name()))
+            
 		if not self.reverse:
 			self.logger.info('Reading tracks from the {} player'.format(self.name()))
-		query = kwargs['query']
 		it = self.sdb.Database.QuerySongs(query)
 		tags = []
 		counter = 0
@@ -219,14 +235,11 @@ class PlexPlayer(MediaPlayer):
 		while connection_attempts_left > 0:
 			time.sleep(1)  # important. Otherwise, the above print statement can be flushed after
 			if (not password) & (not token):
-				self.logger.debug(f'No password or token provided.')
 				password = getpass.getpass()
 			try:
 				if (password):
-					self.logger.debug(f'Connecting to Plex with password.')
 					self.account = MyPlexAccount(username=username, password=password)
 				elif (token):
-					self.logger.debug(f'Connecting to Plex with token.')
 					self.account = MyPlexAccount(username=username, token=token)                    
 				break
 			except NotFound:
@@ -310,7 +323,7 @@ class PlexPlayer(MediaPlayer):
 			See below
 
 		:keyword Arguments:
-			* *title* (``str``) -- Track title
+			* *title*  (``str``)  -- Search by Track title
 			* *rating* (``bool``) -- Search for tracks that have a rating
 
 		:return: a list of matching tracks

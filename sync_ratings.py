@@ -8,7 +8,6 @@ import sys
 from sync_pair import *
 from MediaPlayer import MediaPlayer, MediaMonkey, PlexPlayer
 
-
 class InfoFilter(logging.Filter):
 	def filter(self, rec):
 		return rec.levelno in (logging.DEBUG, logging.INFO)
@@ -122,7 +121,7 @@ class PlexSync:
 			self.logger.info('Attempting to match {} tracks'.format(len(tracks)))
 			sync_pairs = [TrackPair(self.remote_player, self.local_player, track) for track in tracks]
 		else:
-			tracks = self.local_player.search_tracks(query='Rating > 0')
+			tracks = self.local_player.search_tracks(rating = True)
 			self.logger.info('Attempting to match {} tracks'.format(len(tracks)))
 			sync_pairs = [TrackPair(self.local_player, self.remote_player, track) for track in tracks]
 
@@ -160,7 +159,6 @@ class PlexSync:
 		for pair in playlist_pairs:
 			pair.sync()
 
-
 def parse_args():
 	parser = configargparse.ArgumentParser(default_config_files=['./config.ini'],description='Synchronizes ID3 music ratings with a Plex media-server')
 	parser.add_argument('--dry', action='store_true', help='Does not apply any changes')
@@ -174,8 +172,6 @@ def parse_args():
 	parser.add_argument('--token', type=str, help='Plex API token.  See https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/ for information on how to find your token')
 
 	return parser.parse_args()
-
-
 
 if __name__ == "__main__":
 	locale.setlocale(locale.LC_ALL, '')
