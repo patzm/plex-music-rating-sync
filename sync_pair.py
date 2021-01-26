@@ -106,7 +106,7 @@ class TrackPair(SyncPair):
 							part_len = len(part)
 							long_part=index
 					title=title_parts[long_part]
-				candidates = self.destination_player.search_tracks(query="SongTitle like \"%"+ title +"%\"")
+				candidates = self.destination_player.search_tracks(title=title)
 		if len(candidates) == 0:
 			self.sync_state = SyncState.ERROR
 			self.logger.warning('No match found for {}'.format(self.source))

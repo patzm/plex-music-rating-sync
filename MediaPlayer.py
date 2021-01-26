@@ -158,9 +158,30 @@ class MediaMonkey(MediaPlayer):
 		return tag
 
 	def search_tracks(self, **kwargs):
+		"""
+		Searches the MediaMonkey music library for tracks matching the artist and track title
+		:param kwargs:
+			See below
+
+		:keyword Arguments:
+			* *query*  (``str``)   -- MediaMonkey query string
+			* *rating* (``bool``)  -- Search for tracks that have a rating
+			* *title*  (``str``)   -- Search by Track title
+
+		:return: a list of matching tracks
+		:rtype: list<sync_items.AudioTag>
+		"""
+		title = kwargs.get('title')
+		rating = kwargs.get('rating')
+		query = kwargs.get('query')
+		if title: 
+			query = f'SongTitle like "%{title}%"'
+		elif rating:
+			query = 'Rating > 0'
+		self.logger.debug('Executing query [{}] against {}'.format(query, self.name()))
+            
 		if not self.reverse:
 			self.logger.info('Reading tracks from the {} player'.format(self.name()))
-		query = kwargs['query']
 		it = self.sdb.Database.QuerySongs(query)
 		tags = []
 		counter = 0
@@ -202,18 +223,21 @@ class PlexPlayer(MediaPlayer):
 	def name():
 		return 'PlexPlayer'
 
-	def connect(self, server, username, password=''):
+	def connect(self, server, username, password='',token=''):
 		self.logger.info(f'Connecting to the Plex Server {server} with username {username}.')
 		connection_attempts_left = self.maximum_connection_attempts
 		while connection_attempts_left > 0:
 			time.sleep(1)  # important. Otherwise, the above print statement can be flushed after
-			if not password:
+			if (not password) & (not token):
 				password = getpass.getpass()
 			try:
-				self.account = MyPlexAccount(username, password)
+				if (password):
+					self.account = MyPlexAccount(username=username, password=password)
+				elif (token):
+					self.account = MyPlexAccount(username=username, token=token)                    
 				break
 			except NotFound:
-				print(f'Username {username} or password wrong for server {server}.')
+				print(f'Username {username}, password or token wrong for server {server}.')
 				password = ''
 				connection_attempts_left -= 1
 			except BadRequest as error:
@@ -293,7 +317,8 @@ class PlexPlayer(MediaPlayer):
 			See below
 
 		:keyword Arguments:
-			* *title* (``str``) -- Track title
+			* *title*  (``str``)  -- Search by Track title
+			* *rating* (``bool``) -- Search for tracks that have a rating
 
 		:return: a list of matching tracks
 		:rtype: list<plexapi.audio.Track>

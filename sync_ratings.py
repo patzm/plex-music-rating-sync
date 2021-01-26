@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 
-import argparse
+import configargparse
 import locale
 import logging
 import sys
 
 from sync_pair import *
 from MediaPlayer import MediaPlayer, MediaMonkey, PlexPlayer
-
 
 class InfoFilter(logging.Filter):
 	def filter(self, rec):
@@ -96,6 +95,7 @@ class PlexSync:
 			server=self.options.server,
 			username=self.options.username,
 			password=self.options.passwd,
+			token=self.options.token
 		)
 		if self.options.reverse:
 			source_name = self.local_player.name()
@@ -121,7 +121,7 @@ class PlexSync:
 			self.logger.info('Attempting to match {} tracks'.format(len(tracks)))
 			sync_pairs = [TrackPair(self.remote_player, self.local_player, track) for track in tracks]
 		else:
-			tracks = self.local_player.search_tracks(query='Rating > 0')
+			tracks = self.local_player.search_tracks(rating = True)
 			self.logger.info('Attempting to match {} tracks'.format(len(tracks)))
 			sync_pairs = [TrackPair(self.local_player, self.remote_player, track) for track in tracks]
 
@@ -159,9 +159,8 @@ class PlexSync:
 		for pair in playlist_pairs:
 			pair.sync()
 
-
 def parse_args():
-	parser = argparse.ArgumentParser(description='Synchronizes ID3 music ratings with a Plex media-server')
+	parser = configargparse.ArgumentParser(default_config_files=['./config.ini'],description='Synchronizes ID3 music ratings with a Plex media-server')
 	parser.add_argument('--dry', action='store_true', help='Does not apply any changes')
 	parser.add_argument('--reverse', action='store_true', help='Syncs ratings from Plex to local player')
 	parser.add_argument('--sync', nargs='*', default=['tracks'], help='Selects which items to sync: one or more of [tracks, playlists]')
@@ -170,10 +169,9 @@ def parse_args():
 	parser.add_argument('--player', default='MediaMonkey', type=str, help='Media player to synchronize with Plex')
 	parser.add_argument('--server', type=str, required=True, help='The name of the plex media server')
 	parser.add_argument('--username', type=str, required=True, help='The plex username')
+	parser.add_argument('--token', type=str, help='Plex API token.  See https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/ for information on how to find your token')
 
 	return parser.parse_args()
-
-
 
 if __name__ == "__main__":
 	locale.setlocale(locale.LC_ALL, '')
