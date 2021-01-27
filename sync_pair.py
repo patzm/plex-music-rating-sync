@@ -134,7 +134,7 @@ class TrackPair(SyncPair):
 
 		self.rating_source = self.source.rating
 		if self.destination_player.name()=="PlexPlayer": 
-			self.rating_destination = self.destination.userRating
+			self.rating_destination = self.destination_player.get_normed_rating(self.destination.userRating)
 		else:
 			self.rating_destination = self.destination.rating
 

@@ -29,6 +29,7 @@ class PlexSync:
 		self.remote_player = PlexPlayer()
 		self.local_player.dry_run = self.remote_player.dry_run = self.options.dry
 		self.local_player.reverse = self.remote_player.reverse = self.options.reverse
+		self.local_player.full = self.remote_player.full = self.options.full
 
 	def get_player(self):
 		"""
@@ -163,6 +164,7 @@ def parse_args():
 	parser = configargparse.ArgumentParser(default_config_files=['./config.ini'],description='Synchronizes ID3 music ratings with a Plex media-server')
 	parser.add_argument('--dry', action='store_true', help='Does not apply any changes')
 	parser.add_argument('--reverse', action='store_true', help='Syncs ratings from Plex to local player')
+	parser.add_argument('--full', action='store_true', help='Force full synchronization')
 	parser.add_argument('--sync', nargs='*', default=['tracks'], help='Selects which items to sync: one or more of [tracks, playlists]')
 	parser.add_argument('--log', default='info', help='Sets the logging level')
 	parser.add_argument('--passwd', type=str, help='The password for the plex user. NOT RECOMMENDED TO USE!')
@@ -172,7 +174,7 @@ def parse_args():
 	parser.add_argument('--token', type=str, help='Plex API token.  See https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/ for information on how to find your token')
 
 	return parser.parse_args()
-
+	
 if __name__ == "__main__":
 	locale.setlocale(locale.LC_ALL, '')
 	args = parse_args()

@@ -49,6 +49,7 @@ optional arguments:
   -h, --help           show this help message and exit
   --dry                Does not apply any changes
   --reverse            Reverses ratings synchronization from Plex to local player 
+  --full               Force full synchronization.  By default will only evaluate tracks that are different than last synchronization.
   --sync               Selects which items to sync: one or more of: tracks, playlists [default is tracks]
   --log LOG            Sets the logging level
   --passwd PASSWD      The password for the plex user. NOT RECOMMENDED TO USE!
