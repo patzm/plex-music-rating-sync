@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-				  
+
 import configargparse
 import locale
 import logging
