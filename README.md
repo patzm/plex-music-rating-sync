@@ -49,7 +49,7 @@ optional arguments:
   -h, --help           show this help message and exit
   --dry                Does not apply any changes
   --reverse            Reverses ratings synchronization from Plex to local player 
-  --full               Force full synchronization.  By default will only evaluate tracks that are different than last synchronization.
+  --full               *Expirimental* Force full synchronization.  By default will only evaluate tracks that are different than last synchronization.
   --sync               Selects which items to sync: one or more of: tracks, playlists [default is tracks]
   --log LOG            Sets the logging level
   --passwd PASSWD      The password for the plex user. NOT RECOMMENDED TO USE!
@@ -59,6 +59,10 @@ optional arguments:
 Start the synchronization:
 `./sync_ratings.py --server <server_name> --username <my@email.com|user_name>`
 Using the `--dry` flag in combination with `--log DEBUG` is recommended to see what changes will be made.
+
+## Experimental result caching
+* To enable this experimental feature comment out the full sync configuration in config.ini as illustrated below
+`#full = True			#force sync_ratings to always perform a full syncronization`
 
 ## Current issues
 * the [PlexAPI](https://pypi.org/project/PlexAPI/) seems to be only working for the administrator of the PMS.
