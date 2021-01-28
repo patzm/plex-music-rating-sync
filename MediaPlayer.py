@@ -215,7 +215,7 @@ class MediaMonkey(MediaPlayer):
 		elif rating:
 			query = 'Rating > 0'
 		self.logger.debug('Executing query [{}] against {}'.format(query, self.name()))
-		
+
 		if not self.reverse:
 			self.logger.info('Reading tracks from the {} player'.format(self.name()))
 		it = self.sdb.Database.QuerySongs(query)
