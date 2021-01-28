@@ -371,7 +371,7 @@ class PlexPlayer(MediaPlayer):
 			return self.plex_api_connection.playlist(title)
 		except NotFound:
 			self.logger.debug('Playlist {} not found on the remote player'.format(title))
-			return None 
+			return None
 
 	def search_tracks(self, **kwargs):
 		"""
