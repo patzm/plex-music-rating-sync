@@ -397,7 +397,6 @@ class PlexPlayer(MediaPlayer):
 			self.logger.debug('Found {} match{} for query title={}'.format(n_matches, 'es' if n_matches > 1 else '', title))
 		if rating:
 			matches = self.music_library.searchTracks(**{'track.userRating!':'0'})
-
 			if (not self.full) & rating:
 				tags=self.updated_tracks(matches)
 				counter=len(tags)
