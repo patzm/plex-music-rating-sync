@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+				  
 import configargparse
 import locale
 import logging
@@ -99,11 +99,11 @@ class PlexSync:
 			token=self.options.token
 		)
 		if self.options.reverse:
-			source_name = self.local_player.name()
-			destination_name = self.remote_player.name()
-		else:
 			source_name = self.remote_player.name()
 			destination_name = self.local_player.name()
+		else:
+			source_name = self.local_player.name()
+			destination_name = self.remote_player.name()
 		for sync_item in self.options.sync:
 			if sync_item.lower() == "tracks":
 				self.logger.info('Starting to sync track ratings from {} to {}'.format(source_name, destination_name))
@@ -174,7 +174,7 @@ def parse_args():
 	parser.add_argument('--token', type=str, help='Plex API token.  See https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/ for information on how to find your token')
 
 	return parser.parse_args()
-	
+
 if __name__ == "__main__":
 	locale.setlocale(locale.LC_ALL, '')
 	args = parse_args()

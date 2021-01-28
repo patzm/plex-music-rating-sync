@@ -91,21 +91,14 @@ class TrackPair(SyncPair):
 		else:
 			return self.source_player.album_empty(self.source.album) and self.destination_player.album_empty(destination.album)
 
-	def match(self, candidates=None, match_threshold=30):
+	def match(self, candidates=None, match_threshold=60):
+	#TODO: This should be configurable
 		if self.source is None: raise RuntimeError('Source track not set')
 		if candidates is None:
 			if self.destination_player.name()=="PlexPlayer":  
 				candidates = self.destination_player.search_tracks(title=self.source.title)
 			else:
 				title=self.source.title
-				if "\"" in title:
-					part_len=0
-					title_parts = title.split("\"")
-					for index,part in enumerate(title_parts):
-						if len(part) > part_len: 
-							part_len = len(part)
-							long_part=index
-					title=title_parts[long_part]
 				candidates = self.destination_player.search_tracks(title=title)
 		if len(candidates) == 0:
 			self.sync_state = SyncState.ERROR

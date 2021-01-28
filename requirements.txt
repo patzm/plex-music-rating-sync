@@ -3,3 +3,4 @@ fuzzywuzzy
 pypiwin32
 numpy
 ConfigArgParse
+pandas

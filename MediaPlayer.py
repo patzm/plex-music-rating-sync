@@ -134,7 +134,7 @@ class MediaMonkey(MediaPlayer):
 		while not new_tracks.EOF:
 			rated_tracks.append(self.read_track_metadata(new_tracks.Item,textonly=True))
 			new_tracks.Next()
-		df_rated = pd.DataFrame(data=rated_tracks,columns=["Artist","Album","Title","Rating"])
+		df_rated = pd.DataFrame(data=rated_tracks,columns=["Artist","Album","Title","Rating","ID"])
 
 		try:
 			df_old_rated=pd.read_pickle("./.MediaMonkey_rated.pickle")
@@ -145,8 +145,10 @@ class MediaMonkey(MediaPlayer):
 		for index,row in df_updated.iterrows():
 			tag = AudioTag(row['Artist'], row['Album'],row['Title'])
 			tag.rating = row['Rating']
+			tag.ID = row['ID']
 			tags.append(tag)
-		df_old_rated.to_pickle("./.MediaMonkey_rated.pickle")
+		if not self.dry_run: 
+			df_rated.to_pickle("./.MediaMonkey_rated.pickle")
 		return tags        
         
 	def read_child_playlists(self, parent_playlist):
@@ -180,7 +182,7 @@ class MediaMonkey(MediaPlayer):
 
 	def read_track_metadata(self, track, textonly=False):
 		if textonly:
-			tag=[track.Artist.Name, track.Album.Name, track.Title,self.get_normed_rating(track.Rating)]
+			tag=[track.Artist.Name, track.Album.Name, track.Title,self.get_normed_rating(track.Rating),track.ID]
 		else:
 			tag = AudioTag(track.Artist.Name, track.Album.Name, track.Title)
 			tag.rating = self.get_normed_rating(track.Rating)
@@ -203,28 +205,32 @@ class MediaMonkey(MediaPlayer):
 		"""
 		title = kwargs.get('title')
 		rating = kwargs.get('rating')
+		if not (rating):
+			rating = False
 		query = kwargs.get('query')
+		
 		if title: 
-			query = f'SongTitle like "%{title}%"'
+			title=title.replace('"', r'""')
+			query = f'SongTitle = "{title}"'
 		elif rating:
 			query = 'Rating > 0'
 		self.logger.debug('Executing query [{}] against {}'.format(query, self.name()))
-            
+		
 		if not self.reverse:
 			self.logger.info('Reading tracks from the {} player'.format(self.name()))
 		it = self.sdb.Database.QuerySongs(query)
-		if self.full:
+		if (not self.full) & rating:
+			tags=self.updated_tracks(it)
+			counter=len(tags)
+		else:
 			tags = []
 			counter = 0
 			while not it.EOF:
 				tags.append(self.read_track_metadata(it.Item))
 				counter += 1
 				it.Next()
-		else:
-			tags=self.updated_tracks(it)
-			counter=len(tags)
-			
-		if "rating" in query:
+
+		if rating:
 			self.logger.info('Read {} tracks with a rating > 0'.format(counter))
 		return tags
 
@@ -328,6 +334,26 @@ class PlexPlayer(MediaPlayer):
 	def read_playlists(self):
 		raise NotImplemented
 
+	def updated_tracks(self, new_tracks):
+		rated_tracks = []
+		tags=[]
+		for track in new_tracks:
+			rated_tracks.append(self.read_track_metadata(track,textonly=True))
+		df_rated = pd.DataFrame(data=rated_tracks,columns=["Artist","Album","Title","Rating"])
+		try:
+			df_old_rated=pd.read_pickle("./.Plex_rated.pickle")
+		except:
+			df_old_rated=pd.DataFrame()
+			self.logger.debug('Previously rated tracks not found.  Syncing all tracks.')
+		df_updated=df_rated[~df_rated.isin(df_old_rated.to_dict('list')).all(1)]
+		for index,row in df_updated.iterrows():
+			tag = AudioTag(row['Artist'], row['Album'],row['Title'])
+			tag.rating = row['Rating']
+			tags.append(tag)
+		if not self.dry_run: 
+			df_rated.to_pickle("./.Plex_rated.pickle")
+		return tags 
+        
 	def find_playlist(self, **kwargs) -> Optional[plexapi.playlist.Playlist]:
 		"""
 
@@ -345,10 +371,7 @@ class PlexPlayer(MediaPlayer):
 			return self.plex_api_connection.playlist(title)
 		except NotFound:
 			self.logger.debug('Playlist {} not found on the remote player'.format(title))
-			return None
-
-	def updated_tracks(self, **nargs):
-		raise NotImplementedError    
+			return None 
 
 	def search_tracks(self, **kwargs):
 		"""
@@ -365,18 +388,26 @@ class PlexPlayer(MediaPlayer):
 		"""
 		title = kwargs.get('title')
 		rating = kwargs.get('rating')
+		if not rating:
+			rating = False
+
 		if title: 
 			matches = self.music_library.searchTracks(title=title)
 			n_matches = len(matches)
 			self.logger.debug('Found {} match{} for query title={}'.format(n_matches, 'es' if n_matches > 1 else '', title))
 		if rating:
 			matches = self.music_library.searchTracks(**{'track.userRating!':'0'})
-			tags = []
-			counter = 0
-			for x in matches:
-				tags.append(self.read_track_metadata(x))
-				counter += 1
-			self.logger.info('Read {} tracks with a rating > 0'.format(counter))
+
+			if (not self.full) & rating:
+				tags=self.updated_tracks(matches)
+				counter=len(tags)
+			else:
+				tags = []
+				counter = 0
+				for x in matches:
+					tags.append(self.read_track_metadata(x))
+					counter += 1
+			self.logger.info('Found {} tracks with a rating > 0 that need syncing'.format(counter))
 			matches=tags
 		return matches
 
@@ -399,4 +430,3 @@ class PlexPlayer(MediaPlayer):
 			format_plexapi_track(track), self.get_5star_rating(rating))
 		)
 		if not self.dry_run: track.edit(**{'userRating.value': self.get_native_rating(rating)})
-
