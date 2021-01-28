@@ -91,7 +91,7 @@ class TrackPair(SyncPair):
 		else:
 			return self.source_player.album_empty(self.source.album) and self.destination_player.album_empty(destination.album)
 
-	def match(self, candidates=None, match_threshold=60):
+	def match(self, candidates=None, match_threshold=30):
 	#TODO: This should be configurable
 		if self.source is None: raise RuntimeError('Source track not set')
 		if candidates is None:
