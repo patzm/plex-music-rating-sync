@@ -222,4 +222,3 @@ class PlaylistPair(SyncPair):
 					self.remote_player.update_playlist(self.remote, pair.remote, True)
 
 		return True
-
