@@ -387,9 +387,7 @@ class PlexPlayer(MediaPlayer):
 		:rtype: list<plexapi.audio.Track>
 		"""
 		title = kwargs.get('title')
-		rating = kwargs.get('rating')
-		if not rating:
-			rating = False
+		rating = kwargs.get('rating') or False
 
 		if title: 
 			matches = self.music_library.searchTracks(title=title)
