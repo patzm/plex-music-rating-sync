@@ -98,11 +98,11 @@ class PlexSync:
 			token=self.options.token
 		)
 		if self.options.reverse:
-			source_name = self.local_player.name()
-			destination_name = self.remote_player.name()
-		else:
 			source_name = self.remote_player.name()
 			destination_name = self.local_player.name()
+		else:
+			source_name = self.local_player.name()
+			destination_name = self.remote_player.name()
 		for sync_item in self.options.sync:
 			if sync_item.lower() == "tracks":
 				self.logger.info('Starting to sync track ratings from {} to {}'.format(source_name, destination_name))
