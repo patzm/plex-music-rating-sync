@@ -55,7 +55,7 @@ class PlexSync:
 		)
 
 		# Set up the file logger
-		fh = logging.FileHandler(filename='sync_ratings.log', mode='w')
+		fh = logging.FileHandler(filename='sync_ratings.log', encoding='utf-8', mode='w')
 		fh.setLevel(logging.DEBUG)
 		fh.setFormatter(formatter_explicit)
 		self.logger.addHandler(fh)
