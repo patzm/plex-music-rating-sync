@@ -104,3 +104,5 @@ ENV/
 .mypy_cache/
 
 \.idea/
+/config.ini
+/.vscode/
