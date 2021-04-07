@@ -102,3 +102,6 @@ ENV/
 .mypy_cache/
 
 \.idea/
+.vscode/
+config.ini
+.pickle
