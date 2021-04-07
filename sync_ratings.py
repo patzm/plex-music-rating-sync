@@ -5,12 +5,14 @@ import locale
 import logging
 import sys
 
-from sync_pair import *
-from MediaPlayer import MediaPlayer, MediaMonkey, PlexPlayer
+from sync_pair import TrackPair, SyncState, PlaylistPair
+from MediaPlayer import MediaMonkey, PlexPlayer
+
 
 class InfoFilter(logging.Filter):
 	def filter(self, rec):
 		return rec.levelno in (logging.DEBUG, logging.INFO)
+
 
 class PlexSync:
 	log_levels = {
@@ -21,7 +23,7 @@ class PlexSync:
 		'DEBUG': logging.DEBUG
 	}
 
-	def __init__(self, options):   
+	def __init__(self, options):
 		self.logger = logging.getLogger('PlexSync')
 		self.options = options
 		self.setup_logging()
@@ -109,30 +111,32 @@ class PlexSync:
 				self.logger.info('Starting to sync track ratings from {} to {}'.format(source_name, destination_name))
 				self.sync_tracks()
 			elif sync_item.lower() == "playlists":
-				#TODO: finish implementing playlist sync for MediaMonkey -> Plex
+				# TODO: finish implementing playlist sync for MediaMonkey -> Plex
 				self.logger.info('Starting to sync playlists from {} to {}'.format(source_name, destination_name))
 				if not self.options.reverse:
 					self.sync_playlists()
 			else:
-				raise ValueError('Invalid sync item selected: {}'.format(sync_item))			
-        
+				raise ValueError('Invalid sync item selected: {}'.format(sync_item))
+
 	def sync_tracks(self):
 		if self.options.reverse:
 			tracks = self.remote_player.search_tracks(rating=True)
 			self.logger.info('Attempting to match {} tracks'.format(len(tracks)))
 			sync_pairs = [TrackPair(self.remote_player, self.local_player, track) for track in tracks]
 		else:
-			tracks = self.local_player.search_tracks(rating = True)
+			tracks = self.local_player.search_tracks(rating=True)
 			self.logger.info('Attempting to match {} tracks'.format(len(tracks)))
 			sync_pairs = [TrackPair(self.local_player, self.remote_player, track) for track in tracks]
 
 		self.logger.info('Matching source tracks with destination player')
 		matched = 0
 		for pair in sync_pairs:
-			if pair.match(): matched += 1
+			if pair.match():
+				matched += 1
 		self.logger.info('Matched {}/{} tracks'.format(matched, len(sync_pairs)))
 
-		if self.options.dry: self.logger.info('Running a DRY RUN. No changes will be propagated!')
+		if self.options.dry:
+			self.logger.info('Running a DRY RUN. No changes will be propagated!')
 		pairs_need_update = [pair for pair in sync_pairs if pair.sync_state is SyncState.NEEDS_UPDATE]
 		self.logger.info('Synchronizing {} matching tracks without conflicts'.format(len(pairs_need_update)))
 		for pair in pairs_need_update:
@@ -147,10 +151,12 @@ class PlexSync:
 		if self.options.reverse:
 			raise NotImplementedError
 		playlists = self.local_player.read_playlists()
-		playlist_pairs = [PlaylistPair(self.local_player, self.remote_player, pl)
-		                  for pl in playlists if not pl.is_auto_playlist]
+		playlist_pairs = [
+			PlaylistPair(self.local_player, self.remote_player, pl)
+			for pl in playlists if not pl.is_auto_playlist]
 
-		if self.options.dry: self.logger.info('Running a DRY RUN. No changes will be propagated!')
+		if self.options.dry:
+			self.logger.info('Running a DRY RUN. No changes will be propagated!')
 
 		self.logger.info('Matching local playlists with remote player')
 		for pair in playlist_pairs:
@@ -160,8 +166,9 @@ class PlexSync:
 		for pair in playlist_pairs:
 			pair.sync()
 
+
 def parse_args():
-	parser = configargparse.ArgumentParser(default_config_files=['./config.ini'],description='Synchronizes ID3 music ratings with a Plex media-server')
+	parser = configargparse.ArgumentParser(default_config_files=['./config.ini'], description='Synchronizes ID3 music ratings with a Plex media-server')
 	parser.add_argument('--dry', action='store_true', help='Does not apply any changes')
 	parser.add_argument('--reverse', action='store_true', help='Syncs ratings from Plex to local player')
 	parser.add_argument('--full', action='store_true', help='Force full synchronization')
@@ -174,6 +181,7 @@ def parse_args():
 	parser.add_argument('--token', type=str, help='Plex API token.  See https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/ for information on how to find your token')
 
 	return parser.parse_args()
+
 
 if __name__ == "__main__":
 	locale.setlocale(locale.LC_ALL, '')
