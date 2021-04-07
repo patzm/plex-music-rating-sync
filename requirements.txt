@@ -1,6 +1,0 @@
-PlexAPI>=4.5.2
-fuzzywuzzy
-pypiwin32
-numpy
-ConfigArgParse
-pandas
