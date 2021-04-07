@@ -271,7 +271,7 @@ class PlexPlayer(MediaPlayer):
 				print('\t[{}]: {}'.format(key, library.title))
 
 			choice = input('Select the library to sync with: ')
-			self.music_library = music_libraries[choice]
+			self.music_library = music_libraries[int(choice)]
 
 	def read_track_metadata(self, track):
 		tag = AudioTag(track.grandparentTitle, track.parentTitle, track.title)
