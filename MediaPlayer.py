@@ -1,6 +1,7 @@
 import abc
 import logging
 import getpass
+import pandas as pd
 import plexapi.playlist
 import plexapi.audio
 from plexapi.exceptions import BadRequest, NotFound
@@ -9,12 +10,14 @@ import time
 from typing import List, Optional
 
 from sync_items import AudioTag, Playlist
-from utils import *
+from utils import format_plexapi_track, format_mediamonkey_track
+
 
 class MediaPlayer(abc.ABC):
 	album_empty_alias = ''
 	dry_run = False
 	reverse = False
+	full = True
 	rating_maximum = 5
 
 	@staticmethod
@@ -28,7 +31,8 @@ class MediaPlayer(abc.ABC):
 		return ''
 
 	def album_empty(self, album):
-		if not isinstance(album, str): return False
+		if not isinstance(album, str):
+			return False
 		return album == self.album_empty_alias
 
 	def connect(self, *args, **kwargs):
@@ -48,7 +52,8 @@ class MediaPlayer(abc.ABC):
 		return normed_rating * self.rating_maximum
 
 	def get_normed_rating(self, rating):
-		if rating <0: rating = 0
+		if rating < 0:
+			rating = 0
 		return rating / self.rating_maximum
 
 	@abc.abstractmethod
@@ -73,6 +78,10 @@ class MediaPlayer(abc.ABC):
 		"""Returns all tracks matching a particular query"""
 
 	@abc.abstractmethod
+	def updated_tracks(self, **nargs):
+		"""Returns all tracks that have been updated since last execution"""
+
+	@abc.abstractmethod
 	def update_playlist(self, playlist, track, present):
 		"""Updates the playlist, unless in dry run
 		:param playlist:
@@ -90,11 +99,12 @@ class MediaPlayer(abc.ABC):
 		return hash(self.name().lower())
 
 	def __eq__(self, other):
-		if not isinstance(other, type(self)): return NotImplemented
+		if not isinstance(other, type(self)):
+			return NotImplemented
 		return other.name().lower() == self.name().lower()
 
+
 class MediaMonkey(MediaPlayer):
-#TODO logging needs to be updated to reflect whether MediaMonkey is source or destination
 	rating_maximum = 100
 
 	def __init__(self):
@@ -121,6 +131,29 @@ class MediaMonkey(MediaPlayer):
 
 	def find_playlist(self, **nargs):
 		raise NotImplementedError
+
+	def updated_tracks(self, new_tracks):
+		rated_tracks = []
+		tags = []
+		while not new_tracks.EOF:
+			rated_tracks.append(self.read_track_metadata(new_tracks.Item, textonly=True))
+			new_tracks.Next()
+		df_rated = pd.DataFrame(data=rated_tracks, columns=["Artist", "Album", "Title", "Rating", "ID"])
+
+		try:
+			df_old_rated = pd.read_pickle("./.MediaMonkey_rated.pickle")
+		except:
+			df_old_rated = pd.DataFrame()
+			self.logger.debug('Previously rated tracks not found.  Syncing all tracks.')
+		df_updated = df_rated[~df_rated.isin(df_old_rated.to_dict('list')).all(1)]
+		for index, row in df_updated.iterrows():
+			tag = AudioTag(row['Artist'], row['Album'], row['Title'])
+			tag.rating = row['Rating']
+			tag.ID = row['ID']
+			tags.append(tag)
+		if not self.dry_run:
+			df_rated.to_pickle("./.MediaMonkey_rated.pickle")
+		return tags
 
 	def read_child_playlists(self, parent_playlist):
 		"""
@@ -151,10 +184,13 @@ class MediaMonkey(MediaPlayer):
 		self.logger.info('Found {} playlists'.format(len(playlists)))
 		return playlists
 
-	def read_track_metadata(self, track):
-		tag = AudioTag(track.Artist.Name, track.Album.Name, track.Title)
-		tag.rating = self.get_normed_rating(track.Rating)
-		tag.ID = track.ID
+	def read_track_metadata(self, track, textonly=False):
+		if textonly:
+			tag = [track.Artist.Name, track.Album.Name, track.Title, self.get_normed_rating(track.Rating), track.ID]
+		else:
+			tag = AudioTag(track.Artist.Name, track.Album.Name, track.Title)
+			tag.rating = self.get_normed_rating(track.Rating)
+			tag.ID = track.ID
 		return tag
 
 	def search_tracks(self, **kwargs):
@@ -173,24 +209,32 @@ class MediaMonkey(MediaPlayer):
 		"""
 		title = kwargs.get('title')
 		rating = kwargs.get('rating')
+		if not (rating):
+			rating = False
 		query = kwargs.get('query')
-		if title: 
-			query = f'SongTitle like "%{title}%"'
+
+		if title:
+			title = title.replace('"', r'""')
+			query = f'SongTitle = "{title}"'
 		elif rating:
 			query = 'Rating > 0'
 		self.logger.debug('Executing query [{}] against {}'.format(query, self.name()))
-            
+
 		if not self.reverse:
 			self.logger.info('Reading tracks from the {} player'.format(self.name()))
 		it = self.sdb.Database.QuerySongs(query)
-		tags = []
-		counter = 0
-		while not it.EOF:
-			tags.append(self.read_track_metadata(it.Item))
-			counter += 1
-			it.Next()
-			
-		if "rating" in query:
+		if (not self.full) & rating:
+			tags = self.updated_tracks(it)
+			counter = len(tags)
+		else:
+			tags = []
+			counter = 0
+			while not it.EOF:
+				tags.append(self.read_track_metadata(it.Item))
+				counter += 1
+				it.Next()
+
+		if rating:
 			self.logger.info('Read {} tracks with a rating > 0'.format(counter))
 		return tags
 
@@ -201,13 +245,14 @@ class MediaMonkey(MediaPlayer):
 		self.logger.debug('Updating rating of track "{}" to {} stars'.format(
 			format_mediamonkey_track(track), self.get_5star_rating(rating))
 		)
-		if not self.dry_run: 
-			song = self.sdb.Database.QuerySongs('ID='+str(track.ID))
+		if not self.dry_run:
+			song = self.sdb.Database.QuerySongs('ID=' + str(track.ID))
 			song.Item.Rating = self.get_native_rating(rating)
 			song.Item.UpdateDB()
 
+
 class PlexPlayer(MediaPlayer):
-#TODO logging needs to be updated to reflect whether Plex is source or destination
+	# TODO logging needs to be updated to reflect whether Plex is source or destination
 	maximum_connection_attempts = 3
 	rating_maximum = 10
 	album_empty_alias = '[Unknown Album]'
@@ -223,7 +268,7 @@ class PlexPlayer(MediaPlayer):
 	def name():
 		return 'PlexPlayer'
 
-	def connect(self, server, username, password='',token=''):
+	def connect(self, server, username, password='', token=''):
 		self.logger.info(f'Connecting to the Plex Server {server} with username {username}.')
 		connection_attempts_left = self.maximum_connection_attempts
 		while connection_attempts_left > 0:
@@ -234,7 +279,7 @@ class PlexPlayer(MediaPlayer):
 				if (password):
 					self.account = MyPlexAccount(username=username, password=password)
 				elif (token):
-					self.account = MyPlexAccount(username=username, token=token)                    
+					self.account = MyPlexAccount(username=username, token=token)
 				break
 			except NotFound:
 				print(f'Username {username}, password or token wrong for server {server}.')
@@ -257,8 +302,12 @@ class PlexPlayer(MediaPlayer):
 			exit(1)
 
 		self.logger.info('Looking for music libraries')
-		music_libraries = {section.key: section for section in self.plex_api_connection.library.sections() if
-		                   section.type == 'artist'}
+		music_libraries = {
+			section.key:
+				section for section
+				in self.plex_api_connection.library.sections()
+				if section.type == 'artist'}
+
 		if len(music_libraries) == 0:
 			self.logger.error('No music library found')
 			exit(1)
@@ -271,11 +320,14 @@ class PlexPlayer(MediaPlayer):
 				print('\t[{}]: {}'.format(key, library.title))
 
 			choice = input('Select the library to sync with: ')
-			self.music_library = music_libraries[choice]
+			self.music_library = music_libraries[int(choice)]
 
-	def read_track_metadata(self, track):
-		tag = AudioTag(track.grandparentTitle, track.parentTitle, track.title)
-		tag.rating = self.get_normed_rating(track.userRating)
+	def read_track_metadata(self, track, textonly=False):
+		if textonly:
+			tag = [track.grandparentTitle, track.parentTitle, track.title, self.get_normed_rating(track.userRating)]
+		else:
+			tag = AudioTag(track.grandparentTitle, track.parentTitle, track.title)
+			tag.rating = self.get_normed_rating(track.userRating)
 		return tag
 
 	def create_playlist(self, title, tracks: List[plexapi.audio.Track]) -> Optional[plexapi.playlist.Playlist]:
@@ -289,7 +341,27 @@ class PlexPlayer(MediaPlayer):
 			return self.plex_api_connection.createPlaylist(title=title, items=tracks)
 
 	def read_playlists(self):
-		raise NotImplemented
+		raise NotImplementedError
+
+	def updated_tracks(self, new_tracks):
+		rated_tracks = []
+		tags = []
+		for track in new_tracks:
+			rated_tracks.append(self.read_track_metadata(track, textonly=True))
+		df_rated = pd.DataFrame(data=rated_tracks, columns=["Artist", "Album", "Title", "Rating"])
+		try:
+			df_old_rated = pd.read_pickle("./.Plex_rated.pickle")
+		except:
+			df_old_rated = pd.DataFrame()
+			self.logger.debug('Previously rated tracks not found.  Syncing all tracks.')
+		df_updated = df_rated[~df_rated.isin(df_old_rated.to_dict('list')).all(1)]
+		for index, row in df_updated.iterrows():
+			tag = AudioTag(row['Artist'], row['Album'], row['Title'])
+			tag.rating = row['Rating']
+			tags.append(tag)
+		if not self.dry_run:
+			df_rated.to_pickle("./.Plex_rated.pickle")
+		return tags
 
 	def find_playlist(self, **kwargs) -> Optional[plexapi.playlist.Playlist]:
 		"""
@@ -309,7 +381,7 @@ class PlexPlayer(MediaPlayer):
 		except NotFound:
 			self.logger.debug('Playlist {} not found on the remote player'.format(title))
 			return None
-    
+
 	def search_tracks(self, **kwargs):
 		"""
 		Searches the PMS music library for tracks matching the artist and track title
@@ -324,20 +396,25 @@ class PlexPlayer(MediaPlayer):
 		:rtype: list<plexapi.audio.Track>
 		"""
 		title = kwargs.get('title')
-		rating = kwargs.get('rating')
-		if title: 
+		rating = kwargs.get('rating') or False
+
+		if title:
 			matches = self.music_library.searchTracks(title=title)
 			n_matches = len(matches)
 			self.logger.debug('Found {} match{} for query title={}'.format(n_matches, 'es' if n_matches > 1 else '', title))
 		if rating:
-			matches = self.music_library.searchTracks(**{'track.userRating!':'0'})
-			tags = []
-			counter = 0
-			for x in matches:
-				tags.append(self.read_track_metadata(x))
-				counter += 1
-			self.logger.info('Read {} tracks with a rating > 0'.format(counter))
-			matches=tags
+			matches = self.music_library.searchTracks(**{'track.userRating!': '0'})
+			if (not self.full) & rating:
+				tags = self.updated_tracks(matches)
+				counter = len(tags)
+			else:
+				tags = []
+				counter = 0
+				for x in matches:
+					tags.append(self.read_track_metadata(x))
+					counter += 1
+			self.logger.info('Found {} tracks with a rating > 0 that need syncing'.format(counter))
+			matches = tags
 		return matches
 
 	def update_playlist(self, playlist, track, present):
@@ -349,13 +426,16 @@ class PlexPlayer(MediaPlayer):
 		"""
 		if present:
 			self.logger.debug('Adding {} to playlist {}'.format(format_plexapi_track(track), playlist.title))
-			if not self.dry_run: playlist.addItems(track)
+			if not self.dry_run:
+				playlist.addItems(track)
 		else:
 			self.logger.debug('Removing {} from playlist {}'.format(format_plexapi_track(track), playlist.title))
-			if not self.dry_run: playlist.removeItem(track)
+			if not self.dry_run:
+				playlist.removeItem(track)
 
 	def update_rating(self, track, rating):
 		self.logger.debug('Updating rating of track "{}" to {} stars'.format(
 			format_plexapi_track(track), self.get_5star_rating(rating))
 		)
-		if not self.dry_run: track.edit(**{'userRating.value': self.get_native_rating(rating)})
+		if not self.dry_run:
+			track.edit(**{'userRating.value': self.get_native_rating(rating)})

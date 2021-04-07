@@ -3,11 +3,9 @@ from enum import Enum, auto
 from fuzzywuzzy import fuzz
 import logging
 import numpy as np
-from plexapi.audio import Track
 
-import MediaPlayer
-from sync_items import AudioTag, Playlist
-from utils import *
+from sync_items import Playlist
+from utils import format_plexapi_track, format_mediamonkey_track
 
 
 class SyncState(Enum):
@@ -24,11 +22,11 @@ class SyncPair(abc.ABC):
 	sync_state = SyncState.UNKNOWN
 
 	def __init__(self, source_player, destination_player):
-		#"""
-		#TODO: this is no longer true - not sure if it matters
-		#:type local_player: MediaPlayer.MediaPlayer
-		#:type remote_player: MediaPlayer.PlexPlayer
-		#"""
+		# """
+		# TODO: this is no longer true - not sure if it matters
+		# :type local_player: MediaPlayer.MediaPlayer
+		# :type remote_player: MediaPlayer.PlexPlayer
+		# """
 		self.source_player = source_player
 		self.destination_player = destination_player
 
@@ -52,16 +50,17 @@ class SyncPair(abc.ABC):
 		:rtype: bool
 		"""
 
+
 class TrackPair(SyncPair):
 	rating_source = 0.0
 	rating_destination = 0.0
 
 	def __init__(self, source_player, destination_player, source_track):
-		#"""
-		#TODO: this is no longer true - not sure if it matters
-		#:type local_player: MediaPlayer.MediaPlayer
-		#:type remote_player: MediaPlayer.PlexPlayer
-		#"""
+		# """
+		# TODO: this is no longer true - not sure if it matters
+		# :type local_player: MediaPlayer.MediaPlayer
+		# :type remote_player: MediaPlayer.PlexPlayer
+		# """
 		super(TrackPair, self).__init__(source_player, destination_player)
 		self.logger = logging.getLogger('PlexSync.TrackPair')
 		self.source = source_track
@@ -70,7 +69,7 @@ class TrackPair(SyncPair):
 		"""
 		Determines how similar two album names are. It takes into account different conventions for empty album names.
 		:type destination: str
-			 optional album title to compare the album name of the source track with
+			optional album title to compare the album name of the source track with
 		:returns a similarity rating [0, 100]
 		:rtype: int
 		"""
@@ -79,33 +78,28 @@ class TrackPair(SyncPair):
 		if self.both_albums_empty(destination=destination):
 			return 100
 		else:
-			if self.destination_player.name()=="PlexPlayer":            
+			if self.destination_player.name() == "PlexPlayer":
 				return fuzz.ratio(self.source.album, destination.album().title)
 			else:
 				return fuzz.ratio(self.source.album, destination.album)
 
 	def both_albums_empty(self, destination=None):
-		if destination is None: destination = self.destination
-		if self.destination_player.name()=="PlexPlayer":   
+		if destination is None:
+			destination = self.destination
+		if self.destination_player.name() == "PlexPlayer":
 			return self.source_player.album_empty(self.source.album) and self.destination_player.album_empty(destination.album().title)
 		else:
 			return self.source_player.album_empty(self.source.album) and self.destination_player.album_empty(destination.album)
 
 	def match(self, candidates=None, match_threshold=30):
-		if self.source is None: raise RuntimeError('Source track not set')
+		# TODO: This should be configurable
+		if self.source is None:
+			raise RuntimeError('Source track not set')
 		if candidates is None:
-			if self.destination_player.name()=="PlexPlayer":  
+			if self.destination_player.name() == "PlexPlayer":
 				candidates = self.destination_player.search_tracks(title=self.source.title)
 			else:
-				title=self.source.title
-				if "\"" in title:
-					part_len=0
-					title_parts = title.split("\"")
-					for index,part in enumerate(title_parts):
-						if len(part) > part_len: 
-							part_len = len(part)
-							long_part=index
-					title=title_parts[long_part]
+				title = self.source.title
 				candidates = self.destination_player.search_tracks(title=title)
 		if len(candidates) == 0:
 			self.sync_state = SyncState.ERROR
@@ -122,19 +116,19 @@ class TrackPair(SyncPair):
 			return score
 
 		self.destination = candidates[ranks[-1]]
-		if self.destination_player.name()=="PlexPlayer": 
+		if self.destination_player.name() == "PlexPlayer":
 			self.logger.debug('Found match with score {} for {}: {}'.format(
 				score, self.source, format_plexapi_track(self.destination)
 			))
 		else:
-			#TODO: this needs generized to handle multiple local players
+			# TODO: this needs generized to handle multiple local players
 			self.logger.debug('Found match with score {} for {}: {}'.format(
 				score, self.source, format_mediamonkey_track(self.destination)
 			))
 
 		self.rating_source = self.source.rating
-		if self.destination_player.name()=="PlexPlayer": 
-			self.rating_destination = self.destination.userRating
+		if self.destination_player.name() == "PlexPlayer":
+			self.rating_destination = self.destination_player.get_normed_rating(self.destination.userRating)
 		else:
 			self.rating_destination = self.destination.rating
 
@@ -160,18 +154,20 @@ class TrackPair(SyncPair):
 		:returns a similarity rating [0.0, 100.0]
 		:rtype: float
 		"""
-		if self.destination_player.name()=="PlexPlayer": 
-			scores = np.array([fuzz.ratio(self.source.title, candidate.title),
-			                   fuzz.ratio(self.source.artist, candidate.artist().title),
-			                   self.albums_similarity(destination=candidate)])
+		if self.destination_player.name() == "PlexPlayer":
+			scores = np.array([
+				fuzz.ratio(self.source.title, candidate.title),
+				fuzz.ratio(self.source.artist, candidate.artist().title),
+				self.albums_similarity(destination=candidate)])
 		else:
-			scores = np.array([fuzz.ratio(self.source.title, candidate.title),
-			                   fuzz.ratio(self.source.artist, candidate.artist),
-			                   self.albums_similarity(destination=candidate)])  
+			scores = np.array([
+				fuzz.ratio(self.source.title, candidate.title),
+				fuzz.ratio(self.source.artist, candidate.artist),
+				self.albums_similarity(destination=candidate)])
 		return np.average(scores)
 
 	def sync(self):
-		#change everything to source/destination
+		# change everything to source/destination
 		if self.rating_destination <= 0.0:
 			# Propagate the rating of the remote track to the local track
 			self.destination_player.update_rating(self.destination, self.rating_source)
@@ -181,7 +177,7 @@ class TrackPair(SyncPair):
 
 
 class PlaylistPair(SyncPair):
-	#TODO: finish implementing playlist sync for MediaMonkey -> Plexfo
+	# TODO: finish implementing playlist sync for MediaMonkey -> Plexfo
 	remote: [Playlist]
 
 	def __init__(self, local_player, remote_player, local_playlist):
@@ -219,14 +215,13 @@ class PlaylistPair(SyncPair):
 		for pair in track_pairs:
 			pair.match()
 
-		if self.remote is None: # create a new playlist with all tracks
+		if self.remote is None:  # create a new playlist with all tracks
 			remote_tracks = [pair.remote for pair in track_pairs if pair.remote is not None]
 			self.remote = self.remote_player.create_playlist(self.local.name, remote_tracks)
-		else: # playlist already exists, check which items need to be updated
+		else:  # playlist already exists, check which items need to be updated
 			remote_tracks = self.remote.items()
 			for pair in track_pairs:
 				if pair.remote not in remote_tracks:
 					self.remote_player.update_playlist(self.remote, pair.remote, True)
 
 		return True
-
