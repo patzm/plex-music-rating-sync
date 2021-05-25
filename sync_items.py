@@ -1,14 +1,15 @@
-from typing import List, Any
+from typing import List
 
 
 class AudioTag(object):
 	rating = 0
 	genre = ''
 
-	def __init__(self, artist='', album='', title=''):
+	def __init__(self, artist='', album='', title='', track=0):
 		self.album = album
 		self.artist = artist
 		self.title = title
+		self.track = track
 
 	def __str__(self):
 		return ' - '.join([self.artist, self.album, self.title])
@@ -25,7 +26,8 @@ class Playlist(object):
 		:type name: str
 		:type parent_name: str
 		"""
-		if parent_name != '': parent_name += '.'
+		if parent_name != '':
+			parent_name += '.'
 		self.name = parent_name + name
 		self.tracks = []
 
@@ -35,4 +37,3 @@ class Playlist(object):
 
 	def __str__(self):
 		return '{}: {} tracks'.format(self.name, self.num_tracks)
-
