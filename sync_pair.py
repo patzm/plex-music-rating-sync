@@ -143,13 +143,39 @@ class TrackPair(SyncPair):
 			self.sync_state = SyncState.NEEDS_UPDATE
 		elif self.rating_source != self.rating_destination:
 			self.sync_state = SyncState.CONFLICTING
-			self.logger.warning('Found match with conflicting ratings: {} (Source: {} | Destination; {})'.format(
-				self.source, self.rating_source, self.rating_destination)
-			)
 
 		return score
 
 	def resolve_conflict(self):
+		prompt = {
+			"1": "{}: ({}) - Rating: {}".format(self.source_player.name(), self.source, self.source.rating),
+			"2": "{}: ({}) - Rating: {}".format(self.destination_player.name(), self.destination, self.destination.rating),
+			"3": "New rating",
+			"4": "Skip",
+			"5": "Cancel resolving conflicts",
+		}
+		for key in prompt:
+			print('\t[{}]: {}'.format(key, prompt[key]))
+
+		choice = input('Select how to resolve conflicting rating: ')
+		if choice == '1':
+			return self.sync(force=True)
+		if choice == '2':
+			return self.sync(source='destination', force=True)
+		if choice == '3':
+			new_rating = input('Please enter a rating between 0 and 10')
+			try:
+				self.sync(force=True, rating=int(new_rating) / 10)
+				self.sync(source='destination', force=True, rating=int(new_rating) / 10)
+			except Exception as e:
+				print(e)
+			return True
+		if choice == '4':
+			return True
+		if choice == '5':
+			return False
+
+		print('you chose {} which is {}'.format(choice, prompt[choice]))
 		return NotImplemented
 
 	def similarity(self, candidate):
@@ -173,11 +199,19 @@ class TrackPair(SyncPair):
 				self.albums_similarity(destination=candidate)])
 		return np.average(scores)
 
-	def sync(self):
+	def sync(self, force=False, source='source', rating=False):
 		# change everything to source/destination
-		if self.rating_destination <= 0.0:
-			# Propagate the rating of the remote track to the local track
-			self.destination_player.update_rating(self.destination, self.rating_source)
+
+		if (self.rating_destination <= 0.0 or force) and source == 'source':
+			if not rating:
+				rating = self.rating_source
+			# Propagate the rating of the source track to the destination track
+			self.destination_player.update_rating(self.destination, rating)
+		elif force and source == 'destination':
+			if not rating:
+				rating = self.rating_destination
+			# Propagate the rating of the destination track to the source track
+			self.source_player.update_rating(self.source, rating)
 		else:
 			return False
 		return True

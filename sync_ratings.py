@@ -31,6 +31,8 @@ class PlexSync:
 		self.remote_player = PlexPlayer()
 		self.local_player.dry_run = self.remote_player.dry_run = self.options.dry
 		self.local_player.reverse = self.remote_player.reverse = self.options.reverse
+		self.conflicts = []
+		self.updates = []
 
 	def get_player(self):
 		"""
@@ -143,8 +145,27 @@ class PlexSync:
 
 		pairs_conflicting = [pair for pair in sync_pairs if pair.sync_state is SyncState.CONFLICTING]
 		self.logger.info('{} pairs have conflicting ratings'.format(len(pairs_conflicting)))
-		for pair in pairs_conflicting:
-			pair.resolve_conflict()
+		if len (pairs_conflicting) > 0:
+			prompt = {
+				"1": "Keep all ratings from {} and update {}".format(pair.source_player.name(), pair.destination_player.name()),
+				"2": "Keep all ratings from {} and update {}".format(pair.destination_player.name(), pair.source_player.name()),
+				"3": "Choose rating for each track",
+				"4": "Don\'t resolve conflicts"
+			}
+			for key in prompt:
+				print('\t[{}]: {}'.format(key, prompt[key]))
+			choice = input('Select how to resolve conflicting rating: ')
+			if choice == '1':
+				for pair in pairs_conflicting:
+					pair.sync(force=True)
+			elif choice == '2':
+				for pair in pairs_conflicting:
+					pair.sync(source='destination', force=True)
+			elif choice == '3':
+				for pair in pairs_conflicting:
+					result = pair.resolve_conflict()
+					if not result:
+						break
 
 	def sync_playlists(self):
 		if self.options.reverse:
