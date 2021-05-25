@@ -110,9 +110,14 @@ class TrackPair(SyncPair):
 		score = scores[ranks[-1]]
 		if score < match_threshold:
 			self.sync_state = SyncState.ERROR
-			self.logger.debug('Score of best candidate {} is too low: {} < {}'.format(
-				format_plexapi_track(candidates[ranks[-1]]), score, match_threshold
-			))
+			if self.destination_player.name() == "PlexPlayer":
+				self.logger.debug('Score of best candidate {} is too low: {} < {}'.format(
+					format_plexapi_track(candidates[ranks[-1]]), score, match_threshold
+				))
+			else:
+				self.logger.debug('Score of best candidate {} is too low: {} < {}'.format(
+					format_mediamonkey_track(candidates[ranks[-1]]), score, match_threshold
+				))
 			return score
 
 		self.destination = candidates[ranks[-1]]
@@ -158,11 +163,13 @@ class TrackPair(SyncPair):
 			scores = np.array([
 				fuzz.ratio(self.source.title, candidate.title),
 				fuzz.ratio(self.source.artist, candidate.artist().title),
+				100. if self.source.track == candidate.index else 0.,
 				self.albums_similarity(destination=candidate)])
 		else:
 			scores = np.array([
 				fuzz.ratio(self.source.title, candidate.title),
 				fuzz.ratio(self.source.artist, candidate.artist),
+				100. if self.source.track == candidate.track else 0.,
 				self.albums_similarity(destination=candidate)])
 		return np.average(scores)
 

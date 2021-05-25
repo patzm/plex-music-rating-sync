@@ -138,7 +138,7 @@ class MediaMonkey(MediaPlayer):
 		while not new_tracks.EOF:
 			rated_tracks.append(self.read_track_metadata(new_tracks.Item, textonly=True))
 			new_tracks.Next()
-		df_rated = pd.DataFrame(data=rated_tracks, columns=["Artist", "Album", "Title", "Rating", "ID"])
+		df_rated = pd.DataFrame(data=rated_tracks, columns=["Artist", "Album", "Title", "Rating", "Track", "ID"])
 
 		try:
 			df_old_rated = pd.read_pickle("./.MediaMonkey_rated.pickle")
@@ -186,9 +186,9 @@ class MediaMonkey(MediaPlayer):
 
 	def read_track_metadata(self, track, textonly=False):
 		if textonly:
-			tag = [track.Artist.Name, track.Album.Name, track.Title, self.get_normed_rating(track.Rating), track.ID]
+			tag = [track.Artist.Name, track.Album.Name, track.Title, self.get_normed_rating(track.Rating), track.TrackOrder, track.ID]
 		else:
-			tag = AudioTag(track.Artist.Name, track.Album.Name, track.Title)
+			tag = AudioTag(artist=track.Artist.Name, album=track.Album.Name, title=track.Title, track=track.TrackOrder)
 			tag.rating = self.get_normed_rating(track.Rating)
 			tag.ID = track.ID
 		return tag
@@ -223,6 +223,7 @@ class MediaMonkey(MediaPlayer):
 		if not self.reverse:
 			self.logger.info('Reading tracks from the {} player'.format(self.name()))
 		it = self.sdb.Database.QuerySongs(query)
+
 		if (not self.full) & rating:
 			tags = self.updated_tracks(it)
 			counter = len(tags)
@@ -324,9 +325,9 @@ class PlexPlayer(MediaPlayer):
 
 	def read_track_metadata(self, track, textonly=False):
 		if textonly:
-			tag = [track.grandparentTitle, track.parentTitle, track.title, self.get_normed_rating(track.userRating)]
+			tag = [track.grandparentTitle, track.parentTitle, track.title, self.get_normed_rating(track.userRating), track.index]
 		else:
-			tag = AudioTag(track.grandparentTitle, track.parentTitle, track.title)
+			tag = AudioTag(artist=track.grandparentTitle, album=track.parentTitle, title=track.title, track=track.index)
 			tag.rating = self.get_normed_rating(track.userRating)
 		return tag
 
@@ -348,7 +349,7 @@ class PlexPlayer(MediaPlayer):
 		tags = []
 		for track in new_tracks:
 			rated_tracks.append(self.read_track_metadata(track, textonly=True))
-		df_rated = pd.DataFrame(data=rated_tracks, columns=["Artist", "Album", "Title", "Rating"])
+		df_rated = pd.DataFrame(data=rated_tracks, columns=["Artist", "Album", "Title", "Rating", "Track"])
 		try:
 			df_old_rated = pd.read_pickle("./.Plex_rated.pickle")
 		except:
