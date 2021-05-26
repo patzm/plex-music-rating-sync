@@ -5,7 +5,6 @@ import logging
 import numpy as np
 
 from sync_items import Playlist
-from utils import format_plexapi_track, format_mediamonkey_track
 
 
 class SyncState(Enum):
@@ -110,26 +109,15 @@ class TrackPair(SyncPair):
 		score = scores[ranks[-1]]
 		if score < match_threshold:
 			self.sync_state = SyncState.ERROR
-			if self.destination_player.name() == "PlexPlayer":
-				self.logger.debug('Score of best candidate {} is too low: {} < {}'.format(
-					format_plexapi_track(candidates[ranks[-1]]), score, match_threshold
-				))
-			else:
-				self.logger.debug('Score of best candidate {} is too low: {} < {}'.format(
-					format_mediamonkey_track(candidates[ranks[-1]]), score, match_threshold
-				))
+			self.logger.debug('Score of best candidate {} is too low: {} < {}'.format(
+				self.destination_player.format(candidates[ranks[-1]]), score, match_threshold
+			))
 			return score
 
 		self.destination = candidates[ranks[-1]]
-		if self.destination_player.name() == "PlexPlayer":
-			self.logger.debug('Found match with score {} for {}: {}'.format(
-				score, self.source, format_plexapi_track(self.destination)
-			))
-		else:
-			# TODO: this needs generized to handle multiple local players
-			self.logger.debug('Found match with score {} for {}: {}'.format(
-				score, self.source, format_mediamonkey_track(self.destination)
-			))
+		self.logger.debug('Found match with score {} for {}: {}'.format(
+			score, self.source, self.destination_player.format(self.destination)
+		))
 
 		self.rating_source = self.source.rating
 		if self.destination_player.name() == "PlexPlayer":

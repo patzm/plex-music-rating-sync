@@ -145,7 +145,7 @@ class PlexSync:
 
 		pairs_conflicting = [pair for pair in sync_pairs if pair.sync_state is SyncState.CONFLICTING]
 		self.logger.info('{} pairs have conflicting ratings'.format(len(pairs_conflicting)))
-		if len (pairs_conflicting) > 0:
+		if len(pairs_conflicting) > 0:
 			prompt = {
 				"1": "Keep all ratings from {} and update {}".format(pair.source_player.name(), pair.destination_player.name()),
 				"2": "Keep all ratings from {} and update {}".format(pair.destination_player.name(), pair.source_player.name()),

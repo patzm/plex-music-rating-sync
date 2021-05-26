@@ -9,7 +9,6 @@ import time
 from typing import List, Optional
 
 from sync_items import AudioTag, Playlist
-from utils import format_plexapi_track, format_mediamonkey_track
 
 
 class MediaPlayer(abc.ABC):
@@ -27,6 +26,15 @@ class MediaPlayer(abc.ABC):
 		:rtype: str
 		"""
 		return ''
+
+	@staticmethod
+	@abc.abstractclassmethod
+	def format(track):
+		"""
+		Returns a formatted representation of a track in the format of
+		artist name - album name - track title
+		"""
+		return NotImplementedError
 
 	def album_empty(self, album):
 		if not isinstance(album, str):
@@ -109,6 +117,10 @@ class MediaMonkey(MediaPlayer):
 	@staticmethod
 	def name():
 		return 'MediaMonkey'
+
+	@staticmethod
+	def format(track):
+		return ' - '.join([track.artist, track.album, track.title])
 
 	def connect(self, *args):
 		self.logger.info('Connecting to local player {}'.format(self.name()))
@@ -207,7 +219,7 @@ class MediaMonkey(MediaPlayer):
 
 	def update_rating(self, track, rating):
 		self.logger.debug('Updating rating of track "{}" to {} stars'.format(
-			format_mediamonkey_track(track), self.get_5star_rating(rating))
+			self.format(track), self.get_5star_rating(rating))
 		)
 		if not self.dry_run:
 			song = self.sdb.Database.QuerySongs('ID=' + str(track.ID))
@@ -231,6 +243,10 @@ class PlexPlayer(MediaPlayer):
 	@staticmethod
 	def name():
 		return 'PlexPlayer'
+
+	@staticmethod
+	def format(track):
+		return ' - '.join([track.artist().title, track.album().title, track.title])
 
 	def connect(self, server, username, password='', token=''):
 		self.logger.info(f'Connecting to the Plex Server {server} with username {username}.')
@@ -361,17 +377,17 @@ class PlexPlayer(MediaPlayer):
 		:return:
 		"""
 		if present:
-			self.logger.debug('Adding {} to playlist {}'.format(format_plexapi_track(track), playlist.title))
+			self.logger.debug('Adding {} to playlist {}'.format(self.format(track), playlist.title))
 			if not self.dry_run:
 				playlist.addItems(track)
 		else:
-			self.logger.debug('Removing {} from playlist {}'.format(format_plexapi_track(track), playlist.title))
+			self.logger.debug('Removing {} from playlist {}'.format(self.format(track), playlist.title))
 			if not self.dry_run:
 				playlist.removeItem(track)
 
 	def update_rating(self, track, rating):
 		self.logger.debug('Updating rating of track "{}" to {} stars'.format(
-			format_plexapi_track(track), self.get_5star_rating(rating))
+			self.format(track), self.get_5star_rating(rating))
 		)
 		if not self.dry_run:
 			track.edit(**{'userRating.value': self.get_native_rating(rating)})
