@@ -115,7 +115,7 @@ class TrackPair(SyncPair):
 			score, self.source, self.destination_player.format(self.destination)
 		))
 		if score != 100:
-			self.logger.warning('Found match with score {} for {}: {}'.format(
+			self.logger.info('Found match with score {} for {}: {}'.format(
 				score, self.source, self.destination_player.format(self.destination)
 			))
 
