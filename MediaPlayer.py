@@ -30,6 +30,8 @@ class MediaPlayer(abc.ABC):
 	@staticmethod
 	@abc.abstractclassmethod
 	def format(track):
+		# TODO maybe makes more sense to create a track class and make utility functions for __str__, artist, album, title, etc
+		# but having to know what player you are working with up front wasn't workable
 		"""
 		Returns a formatted representation of a track in the format of
 		artist name - album name - track title
@@ -120,6 +122,7 @@ class MediaMonkey(MediaPlayer):
 
 	@staticmethod
 	def format(track):
+		# TODO maybe makes more sense to create a track class and make utility functions for __str__, artist, album, title, etc
 		return ' - '.join([track.artist, track.album, track.title])
 
 	def connect(self, *args):
@@ -168,9 +171,10 @@ class MediaMonkey(MediaPlayer):
 		return playlists
 
 	def read_track_metadata(self, track):
-		tag = AudioTag(artist=track.Artist.Name, album=track.Album.Name, title=track.Title, track=track.TrackOrder)
+		tag = AudioTag(artist=track.Artist.Name, album=track.Album.Name, title=track.Title)
 		tag.rating = self.get_normed_rating(track.Rating)
 		tag.ID = track.ID
+		tag.track = track.TrackOrder
 		return tag
 
 	def search_tracks(self, **kwargs):
@@ -187,8 +191,8 @@ class MediaMonkey(MediaPlayer):
 		:return: a list of matching tracks
 		:rtype: list<sync_items.AudioTag>
 		"""
-		title = kwargs.get('title')
-		rating = kwargs.get('rating')
+		title = kwargs.get('title') or False
+		rating = kwargs.get('rating') or False
 		if not (rating):
 			rating = False
 		query = kwargs.get('query')
@@ -198,10 +202,9 @@ class MediaMonkey(MediaPlayer):
 			query = f'SongTitle = "{title}"'
 		elif rating:
 			query = 'Rating > 0'
+			self.logger.info('Reading tracks from the {} player'.format(self.name()))
 		self.logger.debug('Executing query [{}] against {}'.format(query, self.name()))
 
-		if not self.reverse:
-			self.logger.info('Reading tracks from the {} player'.format(self.name()))
 		it = self.sdb.Database.QuerySongs(query)
 		tags = []
 		counter = 0
@@ -246,7 +249,11 @@ class PlexPlayer(MediaPlayer):
 
 	@staticmethod
 	def format(track):
-		return ' - '.join([track.artist().title, track.album().title, track.title])
+		# TODO maybe makes more sense to create a track class and make utility functions for __str__, artist, album, title, etc
+		try:
+			return ' - '.join([track.artist().title, track.album().title, track.title])
+		except TypeError:
+			return ' - '.join([track.artist, track.album, track.title])
 
 	def connect(self, server, username, password='', token=''):
 		self.logger.info(f'Connecting to the Plex Server {server} with username {username}.')
@@ -303,8 +310,10 @@ class PlexPlayer(MediaPlayer):
 			self.music_library = music_libraries[int(choice)]
 
 	def read_track_metadata(self, track):
-		tag = AudioTag(artist=track.grandparentTitle, album=track.parentTitle, title=track.title, track=track.index)
+		tag = AudioTag(artist=track.grandparentTitle, album=track.parentTitle, title=track.title)
 		tag.rating = self.get_normed_rating(track.userRating)
+		tag.track = track.index
+		tag.ID = track.key
 		return tag
 
 	def create_playlist(self, title, tracks: List[plexapi.audio.Track]) -> Optional[plexapi.playlist.Playlist]:
@@ -352,13 +361,13 @@ class PlexPlayer(MediaPlayer):
 		:return: a list of matching tracks
 		:rtype: list<plexapi.audio.Track>
 		"""
-		title = kwargs.get('title')
+		title = kwargs.get('title') or False
 		rating = kwargs.get('rating') or False
 		if title:
 			matches = self.music_library.searchTracks(title=title)
 			n_matches = len(matches)
 			self.logger.debug('Found {} match{} for query title={}'.format(n_matches, 'es' if n_matches > 1 else '', title))
-		if rating:
+		elif rating:
 			matches = self.music_library.searchTracks(**{'track.userRating!': '0'})
 			tags = []
 			counter = 0
@@ -390,4 +399,8 @@ class PlexPlayer(MediaPlayer):
 			self.format(track), self.get_5star_rating(rating))
 		)
 		if not self.dry_run:
-			track.edit(**{'userRating.value': self.get_native_rating(rating)})
+			try:
+				track.edit(**{'userRating.value': self.get_native_rating(rating)})
+			except AttributeError:
+				song = [s for s in self.music_library.searchTracks(title=track.title) if s.key == track.ID][0]
+				song.edit(**{'userRating.value': self.get_native_rating(rating)})

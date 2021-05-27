@@ -27,16 +27,18 @@ class PlexSync:
 		self.logger = logging.getLogger('PlexSync')
 		self.options = options
 		self.setup_logging()
-		self.local_player = self.get_player()
-		self.remote_player = PlexPlayer()
-		self.local_player.dry_run = self.remote_player.dry_run = self.options.dry
-		self.local_player.reverse = self.remote_player.reverse = self.options.reverse
+		if self.options.reverse:
+			self.source_player = PlexPlayer()
+			self.destination_player = self.get_player()
+		else:
+			self.source_player = self.get_player()
+			self.destination_player = PlexPlayer()
+		self.source_player.dry_run = self.destination_player.dry_run = self.options.dry
 		self.conflicts = []
 		self.updates = []
 
 	def get_player(self):
 		"""
-
 		:rtype: MediaPlayer
 		"""
 		_player = self.options.player.lower()
@@ -94,40 +96,39 @@ class PlexSync:
 			self.logger.addHandler(ch_std)
 
 	def sync(self):
-		self.local_player.connect()
-		self.remote_player.connect(
-			server=self.options.server,
-			username=self.options.username,
-			password=self.options.passwd,
-			token=self.options.token
-		)
 		if self.options.reverse:
-			source_name = self.remote_player.name()
-			destination_name = self.local_player.name()
+			self.source_player.connect(
+				server=self.options.server,
+				username=self.options.username,
+				password=self.options.passwd,
+				token=self.options.token
+			)
+			self.destination_player.connect()
 		else:
-			source_name = self.local_player.name()
-			destination_name = self.remote_player.name()
+			self.destination_player.connect(
+				server=self.options.server,
+				username=self.options.username,
+				password=self.options.passwd,
+				token=self.options.token
+			)
+			self.source_player.connect()
+
 		for sync_item in self.options.sync:
 			if sync_item.lower() == "tracks":
-				self.logger.info('Starting to sync track ratings from {} to {}'.format(source_name, destination_name))
+				self.logger.info('Starting to sync track ratings from {} to {}'.format(self.source_player.name(), self.destination_player.name()))
 				self.sync_tracks()
 			elif sync_item.lower() == "playlists":
 				# TODO: finish implementing playlist sync for MediaMonkey -> Plex
-				self.logger.info('Starting to sync playlists from {} to {}'.format(source_name, destination_name))
 				if not self.options.reverse:
+					self.logger.info('Starting to sync playlists from {} to {}'.format(self.source_player.name(), self.destination_player.name()))
 					self.sync_playlists()
 			else:
 				raise ValueError('Invalid sync item selected: {}'.format(sync_item))
 
 	def sync_tracks(self):
-		if self.options.reverse:
-			tracks = self.remote_player.search_tracks(rating=True)
-			self.logger.info('Attempting to match {} tracks'.format(len(tracks)))
-			sync_pairs = [TrackPair(self.remote_player, self.local_player, track) for track in tracks]
-		else:
-			tracks = self.local_player.search_tracks(rating=True)
-			self.logger.info('Attempting to match {} tracks'.format(len(tracks)))
-			sync_pairs = [TrackPair(self.local_player, self.remote_player, track) for track in tracks]
+		tracks = self.source_player.search_tracks(rating=True)
+		self.logger.info('Attempting to match {} tracks'.format(len(tracks)))
+		sync_pairs = [TrackPair(self.source_player, self.destination_player, track) for track in tracks]
 
 		self.logger.info('Matching source tracks with destination player')
 		matched = 0
@@ -145,27 +146,50 @@ class PlexSync:
 
 		pairs_conflicting = [pair for pair in sync_pairs if pair.sync_state is SyncState.CONFLICTING]
 		self.logger.info('{} pairs have conflicting ratings'.format(len(pairs_conflicting)))
-		if len(pairs_conflicting) > 0:
-			prompt = {
-				"1": "Keep all ratings from {} and update {}".format(pair.source_player.name(), pair.destination_player.name()),
-				"2": "Keep all ratings from {} and update {}".format(pair.destination_player.name(), pair.source_player.name()),
-				"3": "Choose rating for each track",
-				"4": "Don\'t resolve conflicts"
-			}
-			for key in prompt:
-				print('\t[{}]: {}'.format(key, prompt[key]))
-			choice = input('Select how to resolve conflicting rating: ')
-			if choice == '1':
-				for pair in pairs_conflicting:
-					pair.sync(force=True)
-			elif choice == '2':
-				for pair in pairs_conflicting:
-					pair.sync(source='destination', force=True)
-			elif choice == '3':
-				for pair in pairs_conflicting:
-					result = pair.resolve_conflict()
-					if not result:
-						break
+
+		choose = True
+		while choose:
+			choose = False
+			if len(pairs_conflicting) > 0:
+				prompt = {
+					"1": "Keep all ratings from {} and update {}".format(pair.source_player.name(), pair.destination_player.name()),
+					"2": "Keep all ratings from {} and update {}".format(pair.destination_player.name(), pair.source_player.name()),
+					"3": "Choose rating for each track",
+					"4": "Display all conflicts",
+					"5": "Don\'t resolve conflicts"
+				}
+				for key in prompt:
+					print('\t[{}]: {}'.format(key, prompt[key]))
+				choice = input('Select how to resolve conflicting rating: ')
+				if choice == '1':
+					for pair in pairs_conflicting:
+						# do what you were going to do anyway
+						pair.sync(force=True)
+				elif choice == '2':
+					for pair in pairs_conflicting:
+						# reverse source and destination assignment
+						(
+							pair.source, pair.source_player, pair.rating_source,
+							pair.destination, pair.destination_player, pair.rating_destination
+						) = (
+								pair.destination, pair.destination_player, pair.rating_destination,
+								pair.source, pair.source_player, pair.rating_source
+							)
+						pair.sync(force=True)
+				elif choice == '3':
+					for pair in pairs_conflicting:
+						result = pair.resolve_conflict()
+						if not result:
+							break
+				elif choice == '4':
+					for pair in pairs_conflicting:
+						print('Conflict: {} (Source - {}: {} | Destination - {}: {})'.format(
+							pair.source, pair.source_player.name(), pair.rating_source, pair.destination_player.name(), pair.rating_destination)
+						)
+					choose = True
+				elif choice != '5':
+					print('{} is not a valid choice, please try again.'.format(choice))
+					choose = True
 
 	def sync_playlists(self):
 		if self.options.reverse:

@@ -95,11 +95,7 @@ class TrackPair(SyncPair):
 		if self.source is None:
 			raise RuntimeError('Source track not set')
 		if candidates is None:
-			if self.destination_player.name() == "PlexPlayer":
-				candidates = self.destination_player.search_tracks(title=self.source.title)
-			else:
-				title = self.source.title
-				candidates = self.destination_player.search_tracks(title=title)
+			candidates = self.destination_player.search_tracks(title=self.source.title)
 		if len(candidates) == 0:
 			self.sync_state = SyncState.ERROR
 			self.logger.warning('No match found for {}'.format(self.source))
@@ -118,8 +114,14 @@ class TrackPair(SyncPair):
 		self.logger.debug('Found match with score {} for {}: {}'.format(
 			score, self.source, self.destination_player.format(self.destination)
 		))
+		if score != 100:
+			self.logger.warning('Found match with score {} for {}: {}'.format(
+				score, self.source, self.destination_player.format(self.destination)
+			))
 
 		self.rating_source = self.source.rating
+
+		# TODO make this a class method so that all code to get rating is standard
 		if self.destination_player.name() == "PlexPlayer":
 			self.rating_destination = self.destination_player.get_normed_rating(self.destination.userRating)
 		else:
@@ -131,37 +133,58 @@ class TrackPair(SyncPair):
 			self.sync_state = SyncState.NEEDS_UPDATE
 		elif self.rating_source != self.rating_destination:
 			self.sync_state = SyncState.CONFLICTING
+			self.logger.warning('Found match with conflicting ratings: {} (Source: {} | Destination: {})'.format(
+				self.source, self.rating_source, self.rating_destination)
+			)
 
 		return score
 
 	def resolve_conflict(self):
 		prompt = {
-			"1": "{}: ({}) - Rating: {}".format(self.source_player.name(), self.source, self.source.rating),
-			"2": "{}: ({}) - Rating: {}".format(self.destination_player.name(), self.destination, self.destination.rating),
+			"1": "{}: ({}) - Rating: {}".format(self.source_player.name(), self.source, self.rating_source),
+			"2": "{}: ({}) - Rating: {}".format(self.destination_player.name(), self.destination, self.rating_destination),
 			"3": "New rating",
 			"4": "Skip",
 			"5": "Cancel resolving conflicts",
 		}
-		for key in prompt:
-			print('\t[{}]: {}'.format(key, prompt[key]))
+		choose = True
+		while choose:
+			choose = False
+			for key in prompt:
+				print('\t[{}]: {}'.format(key, prompt[key]))
 
-		choice = input('Select how to resolve conflicting rating: ')
-		if choice == '1':
-			return self.sync(force=True)
-		if choice == '2':
-			return self.sync(source='destination', force=True)
-		if choice == '3':
-			new_rating = input('Please enter a rating between 0 and 10')
-			try:
-				self.sync(force=True, rating=int(new_rating) / 10)
-				self.sync(source='destination', force=True, rating=int(new_rating) / 10)
-			except Exception as e:
-				print(e)
-			return True
-		if choice == '4':
-			return True
-		if choice == '5':
-			return False
+			choice = input('Select how to resolve conflicting rating: ')
+			if choice == '1':
+				# apply source rating to destination
+				self.destination_player.update_rating(self.destination, self.rating_source)
+				return True
+			elif choice == '2':
+				# apply destination rating to source
+				self.source_player.update_rating(self.source, self.rating_destination)
+				return True
+			elif choice == '3':
+				# apply new rating to source and destination
+				new_rating = input('Please enter a rating between 0 and 10: ')
+				try:
+					new_rating = int(new_rating) / 10
+					if new_rating < 0:
+						raise Exception('Ratings below 0 not allowed')
+					elif new_rating > 1:
+						raise Exception('Ratings above 10 not allowed')
+					self.destination_player.update_rating(self.destination, new_rating)
+					self.source_player.update_rating(self.source, new_rating)
+					return True
+				except Exception as e:
+					print('Error:', e)
+					print('Rating {} is not a valid rating, please choose an integer between 0 and 10'.format(new_rating))
+					choose = True
+			elif choice == '4':
+				return True
+			elif choice == '5':
+				return False
+			else:
+				print('{} is not a valid choice, please try again.'.format(choice))
+				choose = True
 
 		print('you chose {} which is {}'.format(choice, prompt[choice]))
 		return NotImplemented
@@ -187,19 +210,10 @@ class TrackPair(SyncPair):
 				self.albums_similarity(destination=candidate)])
 		return np.average(scores)
 
-	def sync(self, force=False, source='source', rating=False):
-		# change everything to source/destination
-
-		if (self.rating_destination <= 0.0 or force) and source == 'source':
-			if not rating:
-				rating = self.rating_source
+	def sync(self, force=False):
+		if self.rating_destination <= 0.0 or force:
 			# Propagate the rating of the source track to the destination track
-			self.destination_player.update_rating(self.destination, rating)
-		elif force and source == 'destination':
-			if not rating:
-				rating = self.rating_destination
-			# Propagate the rating of the destination track to the source track
-			self.source_player.update_rating(self.source, rating)
+			self.destination_player.update_rating(self.destination, self.rating_source)
 		else:
 			return False
 		return True
