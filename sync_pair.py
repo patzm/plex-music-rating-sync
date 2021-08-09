@@ -4,6 +4,7 @@ from fuzzywuzzy import fuzz
 import logging
 import numpy as np
 
+from MediaPlayer import MediaPlayer
 from sync_items import Playlist
 
 
@@ -26,8 +27,8 @@ class SyncPair(abc.ABC):
 		# :type local_player: MediaPlayer.MediaPlayer
 		# :type remote_player: MediaPlayer.PlexPlayer
 		# """
-		self.source_player = source_player
-		self.destination_player = destination_player
+		self.source_player: MediaPlayer = source_player
+		self.destination_player: MediaPlayer = destination_player
 
 	@abc.abstractmethod
 	def match(self):
