@@ -59,8 +59,8 @@ class MediaPlayer(abc.ABC):
 	def get_native_rating(self, normed_rating):
 		return normed_rating * self.rating_maximum
 
-	def get_normed_rating(self, rating):
-		if rating < 0:
+	def get_normed_rating(self, rating: Optional[float]):
+		if (rating or 0) <= 0:
 			rating = 0
 		return rating / self.rating_maximum
 
