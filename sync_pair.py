@@ -96,11 +96,11 @@ class TrackPair(SyncPair):
 			raise RuntimeError('Source track not set')
 
 		if candidates is None:
-            try:
-                candidates = self.destination_player.search_tracks(key="title", value=self.source.title)
-            except ValueError as e:
-                self.logger.error(f"Failed to search tracks for track {self.source}.")
-                raise e
+			try:
+				candidates = self.destination_player.search_tracks(key="title", value=self.source.title)
+			except ValueError as e:
+				self.logger.error(f"Failed to search tracks for track {self.source}.")
+				raise e
 
 		if len(candidates) == 0:
 			self.sync_state = SyncState.ERROR
