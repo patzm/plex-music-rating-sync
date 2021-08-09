@@ -73,6 +73,14 @@ class MediaPlayer(abc.ABC):
 		"""
 
 	@abc.abstractmethod
+	def read_track_metadata(self, track) -> AudioTag:
+		"""
+
+		:param track: The track for which to read the metadata.
+		:return: The metadata stored in an audio tag instance.
+		"""
+
+	@abc.abstractmethod
 	def find_playlist(self, **nargs):
 		"""
 
@@ -183,7 +191,7 @@ class MediaMonkey(MediaPlayer):
 		self.logger.info('Found {} playlists'.format(len(playlists)))
 		return playlists
 
-	def read_track_metadata(self, track):
+	def read_track_metadata(self, track) -> AudioTag:
 		tag = AudioTag(artist=track.Artist.Name, album=track.Album.Name, title=track.Title)
 		tag.rating = self.get_normed_rating(track.Rating)
 		tag.ID = track.ID
@@ -310,7 +318,7 @@ class PlexPlayer(MediaPlayer):
 			choice = input('Select the library to sync with: ')
 			self.music_library = music_libraries[int(choice)]
 
-	def read_track_metadata(self, track):
+	def read_track_metadata(self, track) -> AudioTag:
 		tag = AudioTag(artist=track.grandparentTitle, album=track.parentTitle, title=track.title)
 		tag.rating = self.get_normed_rating(track.userRating)
 		tag.track = track.index
