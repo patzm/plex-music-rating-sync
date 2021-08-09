@@ -2,22 +2,19 @@ from typing import List
 
 
 class AudioTag(object):
-	rating = 0
-	genre = ''
 
 	def __init__(self, artist='', album='', title=''):
 		self.album = album
 		self.artist = artist
 		self.title = title
+		self.rating = 0
+		self.genre = ''
 
 	def __str__(self):
 		return ' - '.join([self.artist, self.album, self.title])
 
 
 class Playlist(object):
-	tracks: List[AudioTag]
-	is_auto_playlist = False
-	name = ''
 
 	def __init__(self, name, parent_name=''):
 		"""
@@ -28,7 +25,8 @@ class Playlist(object):
 		if parent_name != '':
 			parent_name += '.'
 		self.name = parent_name + name
-		self.tracks = []
+		self.tracks: List[AudioTag] = []
+		self.is_auto_playlist = False
 
 	@property
 	def num_tracks(self):
