@@ -90,7 +90,7 @@ class MediaPlayer(abc.ABC):
 		"""
 
 	@abc.abstractmethod
-	def search_tracks(self, key: str, value: Union[bool, str]):
+	def search_tracks(self, key: str, value: Union[bool, str]) -> List[AudioTag]:
 		"""Search the MediaMonkey music library for tracks matching the artist and track title.
 
 		:param key: The search mode. Valid modes are:
@@ -198,7 +198,7 @@ class MediaMonkey(MediaPlayer):
 		tag.track = track.TrackOrder
 		return tag
 
-	def search_tracks(self, key: str, value: Union[bool, str]):
+	def search_tracks(self, key: str, value: Union[bool, str]) -> List[AudioTag]:
 		if not value:
 			raise ValueError(f"value can not be empty.")
 		if key == "title":
@@ -357,7 +357,7 @@ class PlexPlayer(MediaPlayer):
 			self.logger.debug('Playlist {} not found on the remote player'.format(title))
 			return None
 
-	def search_tracks(self, key: str, value: Union[bool, str]):
+	def search_tracks(self, key: str, value: Union[bool, str]) -> List[AudioTag]:
 		if not value:
 			raise ValueError(f"value can not be empty.")
 		if key == "title":
