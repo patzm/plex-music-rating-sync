@@ -29,6 +29,7 @@ class PlexSync:
 		self.options = options
 		self.setup_logging()
 		self.source_player: Optional[MediaPlayer] = None
+		self.destination_player: Optional[MediaPlayer] = None
 		if self.options.reverse:
 			self.source_player = PlexPlayer()
 			self.destination_player = self.get_player()
