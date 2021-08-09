@@ -192,7 +192,7 @@ class MediaMonkey(MediaPlayer):
 		return playlists
 
 	def read_track_metadata(self, track) -> AudioTag:
-		tag = AudioTag(artist=track.Artist.Name, album=track.Album.Name, title=track.Title)
+		tag = AudioTag(artist=track.Artist.Name, album=track.Album.Name, title=track.Title, file_path=track.Path)
 		tag.rating = self.get_normed_rating(track.Rating)
 		tag.ID = track.ID
 		tag.track = track.TrackOrder
@@ -318,8 +318,8 @@ class PlexPlayer(MediaPlayer):
 			choice = input('Select the library to sync with: ')
 			self.music_library = music_libraries[int(choice)]
 
-	def read_track_metadata(self, track) -> AudioTag:
-		tag = AudioTag(artist=track.grandparentTitle, album=track.parentTitle, title=track.title)
+	def read_track_metadata(self, track: plexapi.audio.Track) -> AudioTag:
+		tag = AudioTag(artist=track.grandparentTitle, album=track.parentTitle, title=track.title, file_path=track.locations[0])
 		tag.rating = self.get_normed_rating(track.userRating)
 		tag.track = track.index
 		tag.ID = track.key
