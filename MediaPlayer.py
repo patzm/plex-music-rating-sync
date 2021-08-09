@@ -86,13 +86,13 @@ class MediaPlayer(abc.ABC):
 		"""Returns all tracks matching a particular query"""
 
 	@abc.abstractmethod
-	def update_playlist(self, playlist, track, present):
+	def update_playlist(self, playlist, track, present: bool):
 		"""Updates the playlist, unless in dry run
 		:param playlist:
 			The playlist native to this player that shall be updated
 		:param track:
 			The track to update
-		:type present: bool
+		:param present:
 		"""
 
 	@abc.abstractmethod
