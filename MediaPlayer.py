@@ -191,6 +191,8 @@ class MediaMonkey(MediaPlayer):
 		return tag
 
 	def search_tracks(self, key: str, value: Union[bool, str]):
+		if not value:
+			raise ValueError(f"value can not be empty.")
 		if key == "title":
 			title = value.replace('"', r'""')
 			query = f'SongTitle = "{title}"'
@@ -348,6 +350,8 @@ class PlexPlayer(MediaPlayer):
 			return None
 
 	def search_tracks(self, key: str, value: Union[bool, str]):
+		if not value:
+			raise ValueError(f"value can not be empty.")
 		if key == "title":
 			matches = self.music_library.searchTracks(title=value)
 			n_matches = len(matches)
