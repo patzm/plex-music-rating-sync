@@ -128,7 +128,7 @@ class PlexSync:
 				raise ValueError('Invalid sync item selected: {}'.format(sync_item))
 
 	def sync_tracks(self):
-		tracks = self.source_player.search_tracks(rating=True)
+		tracks = self.source_player.search_tracks(key="rating", value=True)
 		self.logger.info('Attempting to match {} tracks'.format(len(tracks)))
 		sync_pairs = [TrackPair(self.source_player, self.destination_player, track) for track in tracks]
 
