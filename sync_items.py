@@ -3,12 +3,13 @@ from typing import List
 
 class AudioTag(object):
 
-	def __init__(self, artist='', album='', title=''):
+	def __init__(self, artist='', album='', title='', file_path=None):
 		self.album = album
 		self.artist = artist
 		self.title = title
 		self.rating = 0
 		self.genre = ''
+		self.file_path = file_path
 
 	def __str__(self):
 		return ' - '.join([self.artist, self.album, self.title])
