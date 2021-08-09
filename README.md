@@ -15,8 +15,8 @@ This project aims to provide a simple sync tool that synchronizes the track rati
 
 ## Requirements
 * Windows
-* [MediaMonkey](http://www.mediamonkey.com/) v4.x. v5.0 and above don't work, see #23.
-*  _Plex Media Server_ (PMS)
+* [MediaMonkey](http://www.mediamonkey.com/) v4.x. v5.0 and above don't work, see [#23](https://github.com/patzm/plex-music-rating-sync/issues/23#issuecomment-894646791).
+* _Plex Media Server_ (PMS)
 * Python 3.6 or higher with packages:
     * [PlexAPI v4.2.0](https://pypi.org/project/PlexAPI/)
     * [pypiwin32](https://pypi.org/project/pypiwin32/): to use the COM interface
