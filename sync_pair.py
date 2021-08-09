@@ -100,7 +100,7 @@ class TrackPair(SyncPair):
 			try:
 				candidates = self.destination_player.search_tracks(key="title", value=self.source.title)
 			except ValueError as e:
-				self.logger.error(f"Failed to search tracks for track {self.source}.")
+				self.logger.error(f"Failed to search tracks for track '{self.source}' stored at {self.source.file_path}.")
 				raise e
 
 		if len(candidates) == 0:
