@@ -5,7 +5,7 @@ import logging
 import numpy as np
 
 from MediaPlayer import MediaPlayer
-from sync_items import Playlist
+from sync_items import Playlist, AudioTag
 
 
 class SyncState(Enum):
@@ -55,7 +55,7 @@ class TrackPair(SyncPair):
 	rating_source = 0.0
 	rating_destination = 0.0
 
-	def __init__(self, source_player, destination_player, source_track):
+	def __init__(self, source_player, destination_player, source_track: AudioTag):
 		# """
 		# TODO: this is no longer true - not sure if it matters
 		# :type local_player: MediaPlayer.MediaPlayer
