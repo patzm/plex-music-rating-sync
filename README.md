@@ -23,8 +23,8 @@ This project aims to provide a simple sync tool that synchronizes the track rati
     * [fuzzywuzzy](https://github.com/seatgeek/fuzzywuzzy): for fuzzy string matching
     * [python-Levenshtein](https://github.com/miohtama/python-Levenshtein) (optional): to improve performance of `fuzzywuzzy`
     * [numpy](https://pypi.org/project/numpy/)
-	* [ConfigArgParse](https://pypi.org/project/ConfigArgParse/)
-	* [pandas](https://pandas.pydata.org/)
+    * [ConfigArgParse](https://pypi.org/project/ConfigArgParse/)
+    * [pandas](https://pandas.pydata.org/)
 
 ## Installation
 
