@@ -95,7 +95,7 @@ class TrackPair(SyncPair):
 		if self.source is None:
 			raise RuntimeError('Source track not set')
 		if candidates is None:
-			candidates = self.destination_player.search_tracks(title=self.source.title)
+			candidates = self.destination_player.search_tracks(key="title", value=self.source.title)
 		if len(candidates) == 0:
 			self.sync_state = SyncState.ERROR
 			self.logger.warning('No match found for {}'.format(self.source))
