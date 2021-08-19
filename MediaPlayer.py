@@ -6,7 +6,7 @@ import plexapi.audio
 from plexapi.exceptions import BadRequest, NotFound
 from plexapi.myplex import MyPlexAccount
 import time
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from sync_items import AudioTag, Playlist
 
@@ -73,6 +73,14 @@ class MediaPlayer(abc.ABC):
 		"""
 
 	@abc.abstractmethod
+	def read_track_metadata(self, track) -> AudioTag:
+		"""
+
+		:param track: The track for which to read the metadata.
+		:return: The metadata stored in an audio tag instance.
+		"""
+
+	@abc.abstractmethod
 	def find_playlist(self, **nargs):
 		"""
 
@@ -82,17 +90,30 @@ class MediaPlayer(abc.ABC):
 		"""
 
 	@abc.abstractmethod
-	def search_tracks(self, **nargs):
-		"""Returns all tracks matching a particular query"""
+	def search_tracks(self, key: str, value: Union[bool, str]) -> List[AudioTag]:
+		"""Search the MediaMonkey music library for tracks matching the artist and track title.
+
+		:param key: The search mode. Valid modes are:
+
+			* *rating*  -- Search for tracks that have a rating.
+			* *title*   -- Search by track title.
+			* *query*   -- MediaMonkey query string, free form.
+
+		:param value: The value to search for.
+
+		:return: a list of matching tracks
+		:rtype: list<sync_items.AudioTag>
+		"""
+		pass
 
 	@abc.abstractmethod
-	def update_playlist(self, playlist, track, present):
+	def update_playlist(self, playlist, track, present: bool):
 		"""Updates the playlist, unless in dry run
 		:param playlist:
 			The playlist native to this player that shall be updated
 		:param track:
 			The track to update
-		:type present: bool
+		:param present:
 		"""
 
 	@abc.abstractmethod
@@ -170,40 +191,29 @@ class MediaMonkey(MediaPlayer):
 		self.logger.info('Found {} playlists'.format(len(playlists)))
 		return playlists
 
-	def read_track_metadata(self, track):
-		tag = AudioTag(artist=track.Artist.Name, album=track.Album.Name, title=track.Title)
+	def read_track_metadata(self, track) -> AudioTag:
+		tag = AudioTag(artist=track.Artist.Name, album=track.Album.Name, title=track.Title, file_path=track.Path)
 		tag.rating = self.get_normed_rating(track.Rating)
 		tag.ID = track.ID
 		tag.track = track.TrackOrder
 		return tag
 
-	def search_tracks(self, **kwargs):
-		"""
-		Searches the MediaMonkey music library for tracks matching the artist and track title
-		:param kwargs:
-			See below
-
-		:keyword Arguments:
-			* *query*  (``str``)   -- MediaMonkey query string
-			* *rating* (``bool``)  -- Search for tracks that have a rating
-			* *title*  (``str``)   -- Search by Track title
-
-		:return: a list of matching tracks
-		:rtype: list<sync_items.AudioTag>
-		"""
-		title = kwargs.get('title') or False
-		rating = kwargs.get('rating') or False
-		if not (rating):
-			rating = False
-		query = kwargs.get('query')
-
-		if title:
-			title = title.replace('"', r'""')
+	def search_tracks(self, key: str, value: Union[bool, str]) -> List[AudioTag]:
+		if not value:
+			raise ValueError(f"value can not be empty.")
+		if key == "title":
+			title = value.replace('"', r'""')
 			query = f'SongTitle = "{title}"'
-		elif rating:
-			query = 'Rating > 0'
+		elif key == "rating":
+			if value is True:
+				value = "> 0"
+			query = f'Rating {value}'
 			self.logger.info('Reading tracks from the {} player'.format(self.name()))
-		self.logger.debug('Executing query [{}] against {}'.format(query, self.name()))
+		elif key == "query":
+			query = value
+		else:
+			raise KeyError(f"Invalid search mode {key}.")
+		self.logger.debug(f'Executing query [{query}] against {self.name()}')
 
 		it = self.sdb.Database.QuerySongs(query)
 		tags = []
@@ -213,8 +223,7 @@ class MediaMonkey(MediaPlayer):
 			counter += 1
 			it.Next()
 
-		if rating:
-			self.logger.info('Read {} tracks with a rating > 0'.format(counter))
+		self.logger.info(f'Found {counter} tracks for query {query}.')
 		return tags
 
 	def update_playlist(self, playlist, track, present):
@@ -309,8 +318,8 @@ class PlexPlayer(MediaPlayer):
 			choice = input('Select the library to sync with: ')
 			self.music_library = music_libraries[int(choice)]
 
-	def read_track_metadata(self, track):
-		tag = AudioTag(artist=track.grandparentTitle, album=track.parentTitle, title=track.title)
+	def read_track_metadata(self, track: plexapi.audio.Track) -> AudioTag:
+		tag = AudioTag(artist=track.grandparentTitle, album=track.parentTitle, title=track.title, file_path=track.locations[0])
 		tag.rating = self.get_normed_rating(track.userRating)
 		tag.track = track.index
 		tag.ID = track.key
@@ -348,27 +357,18 @@ class PlexPlayer(MediaPlayer):
 			self.logger.debug('Playlist {} not found on the remote player'.format(title))
 			return None
 
-	def search_tracks(self, **kwargs):
-		"""
-		Searches the PMS music library for tracks matching the artist and track title
-		:param kwargs:
-			See below
-
-		:keyword Arguments:
-			* *title*  (``str``)  -- Search by Track title
-			* *rating* (``bool``) -- Search for tracks that have a rating
-
-		:return: a list of matching tracks
-		:rtype: list<plexapi.audio.Track>
-		"""
-		title = kwargs.get('title') or False
-		rating = kwargs.get('rating') or False
-		if title:
-			matches = self.music_library.searchTracks(title=title)
+	def search_tracks(self, key: str, value: Union[bool, str]) -> List[AudioTag]:
+		if not value:
+			raise ValueError(f"value can not be empty.")
+		if key == "title":
+			matches = self.music_library.searchTracks(title=value)
 			n_matches = len(matches)
-			self.logger.debug('Found {} match{} for query title={}'.format(n_matches, 'es' if n_matches > 1 else '', title))
-		elif rating:
-			matches = self.music_library.searchTracks(**{'track.userRating!': '0'})
+			s_matches = f"match{'es' if n_matches > 1 else ''}"
+			self.logger.debug(f'Found {n_matches} {s_matches} for query title={value}')
+		elif key == "rating":
+			if value is True:
+				value = "0"
+			matches = self.music_library.searchTracks(**{'track.userRating!': value})
 			tags = []
 			counter = 0
 			for x in matches:
@@ -376,6 +376,8 @@ class PlexPlayer(MediaPlayer):
 				counter += 1
 			self.logger.info('Found {} tracks with a rating > 0 that need syncing'.format(counter))
 			matches = tags
+		else:
+			raise KeyError(f"Invalid search mode {key}.")
 		return matches
 
 	def update_playlist(self, playlist, track, present):

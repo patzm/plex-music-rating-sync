@@ -4,7 +4,8 @@ from fuzzywuzzy import fuzz
 import logging
 import numpy as np
 
-from sync_items import Playlist
+from MediaPlayer import MediaPlayer
+from sync_items import Playlist, AudioTag
 
 
 class SyncState(Enum):
@@ -26,8 +27,8 @@ class SyncPair(abc.ABC):
 		# :type local_player: MediaPlayer.MediaPlayer
 		# :type remote_player: MediaPlayer.PlexPlayer
 		# """
-		self.source_player = source_player
-		self.destination_player = destination_player
+		self.source_player: MediaPlayer = source_player
+		self.destination_player: MediaPlayer = destination_player
 
 	@abc.abstractmethod
 	def match(self):
@@ -54,7 +55,7 @@ class TrackPair(SyncPair):
 	rating_source = 0.0
 	rating_destination = 0.0
 
-	def __init__(self, source_player, destination_player, source_track):
+	def __init__(self, source_player, destination_player, source_track: AudioTag):
 		# """
 		# TODO: this is no longer true - not sure if it matters
 		# :type local_player: MediaPlayer.MediaPlayer
@@ -94,8 +95,14 @@ class TrackPair(SyncPair):
 		# TODO: threshold should be configurable
 		if self.source is None:
 			raise RuntimeError('Source track not set')
+
 		if candidates is None:
-			candidates = self.destination_player.search_tracks(title=self.source.title)
+			try:
+				candidates = self.destination_player.search_tracks(key="title", value=self.source.title)
+			except ValueError as e:
+				self.logger.error(f"Failed to search tracks for track '{self.source}' stored at {self.source.file_path}.")
+				raise e
+
 		if len(candidates) == 0:
 			self.sync_state = SyncState.ERROR
 			self.logger.warning('No match found for {}'.format(self.source))

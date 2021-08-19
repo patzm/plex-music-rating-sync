@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from typing import Optional
 
 import configargparse
 import locale
@@ -6,7 +7,7 @@ import logging
 import sys
 
 from sync_pair import TrackPair, SyncState, PlaylistPair
-from MediaPlayer import MediaMonkey, PlexPlayer
+from MediaPlayer import MediaMonkey, MediaPlayer, PlexPlayer
 
 
 class InfoFilter(logging.Filter):
@@ -27,6 +28,8 @@ class PlexSync:
 		self.logger = logging.getLogger('PlexSync')
 		self.options = options
 		self.setup_logging()
+		self.source_player: Optional[MediaPlayer] = None
+		self.destination_player: Optional[MediaPlayer] = None
 		if self.options.reverse:
 			self.source_player = PlexPlayer()
 			self.destination_player = self.get_player()
@@ -126,7 +129,7 @@ class PlexSync:
 				raise ValueError('Invalid sync item selected: {}'.format(sync_item))
 
 	def sync_tracks(self):
-		tracks = self.source_player.search_tracks(rating=True)
+		tracks = self.source_player.search_tracks(key="rating", value=True)
 		self.logger.info('Attempting to match {} tracks'.format(len(tracks)))
 		sync_pairs = [TrackPair(self.source_player, self.destination_player, track) for track in tracks]
 
