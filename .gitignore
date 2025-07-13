@@ -45,6 +45,7 @@ nosetests.xml
 coverage.xml
 *.cover
 .hypothesis/
+*,cover
 
 # Translations
 *.mo
@@ -104,4 +105,11 @@ ENV/
 \.idea/
 .vscode/
 config.ini
-.pickle
+*.pkl
+logs/
+docs/reports/
+docs/testing/
+*.zip
+*.tar.gz
+
+.github/*instructions.md

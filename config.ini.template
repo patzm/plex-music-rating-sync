@@ -1,6 +1,15 @@
-#server = 		#The name of the plex media server
-#user = 		#The plex username
-#player = 		#Media player to synchronize with Plex
-#reverse = 		#TRUE=local player to Plex, FALSE = local player to Plex
-#sync = 		#items to sync between local player and Plex one or more of [tracks, playlists]
-#token = 		#Plex API token.  See https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/ for information on how to find your token'
+[main]
+source = mediamonkey    #Source player (plex, mediamonkey or filesystem)
+destination = plex      #Destination player (plex, mediamonkey or filesystem)
+sync = [tracks]         #items to sync between players, one or more of [tracks, playlists]
+log =                   #log level (CRITICAL, ERROR, WARNING, INFO, DEBUG, TRACE) [default: WARNING]
+cache-mode =            #Cache mode: metadata, matches, matches-only, disabled [default: metadata]
+
+[plex]
+server =                #The name of the plex media server
+username =                  #The plex username
+token =                 #Plex API token. See https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/
+
+[filesystem]
+path =                  # Path to music directory for filesystem player
+playlist-path =         # Path to playlists directory [default: path]

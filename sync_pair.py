@@ -1,277 +1,399 @@
 import abc
-from enum import Enum, auto
-from fuzzywuzzy import fuzz
 import logging
-import numpy as np
+from enum import Enum, IntEnum, auto
+from typing import List, Tuple
 
+import numpy as np
+from fuzzywuzzy import fuzz
+
+from manager import get_manager
 from MediaPlayer import MediaPlayer
-from sync_items import Playlist, AudioTag
+from ratings import Rating
+from sync_items import AudioTag, Playlist
 
 
 class SyncState(Enum):
-	UNKNOWN = auto()
-	UP_TO_DATE = auto()
-	NEEDS_UPDATE = auto()
-	CONFLICTING = auto()
-	ERROR = auto()
+    UNKNOWN = auto()
+    UP_TO_DATE = auto()
+    NEEDS_UPDATE = auto()
+    CONFLICTING = auto()
+    ERROR = auto()
+
+
+class MatchThreshold(IntEnum):
+    MINIMUM_ACCEPTABLE = 30
+    POOR_MATCH = MINIMUM_ACCEPTABLE
+    GOOD_MATCH = 80
+    PERFECT_MATCH = 100
+
+    def __str__(self) -> str:
+        return self.name.replace("_MATCH", "").title()
 
 
 class SyncPair(abc.ABC):
-	source = None
-	destination = None
-	sync_state = SyncState.UNKNOWN
+    source = None
+    destination = None
+    sync_state = SyncState.UNKNOWN
 
-	def __init__(self, source_player, destination_player):
-		# """
-		# TODO: this is no longer true - not sure if it matters
-		# :type local_player: MediaPlayer.MediaPlayer
-		# :type remote_player: MediaPlayer.PlexPlayer
-		# """
-		self.source_player: MediaPlayer = source_player
-		self.destination_player: MediaPlayer = destination_player
+    def __init__(self, source_player: MediaPlayer, destination_player: MediaPlayer) -> None:
+        mgr = get_manager()
+        self.stats_mgr = mgr.get_stats_manager()
+        self.cache_mgr = mgr.get_cache_manager()
+        self.source_player: MediaPlayer = source_player
+        self.destination_player: MediaPlayer = destination_player
 
-	@abc.abstractmethod
-	def match(self):
-		"""Tries to find a match on the destination player that matches the source replica as good as possible"""
+    @abc.abstractmethod
+    def match(self, *args, **kwargs) -> bool:
+        """Tries to find a match on the destination player that matches the source replica as good as possible"""
 
-	@abc.abstractmethod
-	def resolve_conflict(self):
-		"""Tries to resolve a conflict as good as possible and optionally prompts the user to resolve it manually"""
+    @abc.abstractmethod
+    def similarity(self, candidate: AudioTag) -> float:
+        """Determines the similarity of the source replica with the candidate replica"""
 
-	@abc.abstractmethod
-	def similarity(self, candidate):
-		"""Determines the similarity of the source replica with the candidate replica"""
-
-	@abc.abstractmethod
-	def sync(self):
-		"""
-		Synchronizes the source and destination replicas
-		:return flag indicating success
-		:rtype: bool
-		"""
+    @abc.abstractmethod
+    def sync(self, force: bool = False) -> bool:
+        """Synchronizes the source and destination replicas"""
 
 
 class TrackPair(SyncPair):
-	rating_source = 0.0
-	rating_destination = 0.0
+    rating_source: Rating | None = None
+    rating_destination: Rating | None = None
+    score: int | None = None
 
-	def __init__(self, source_player, destination_player, source_track: AudioTag):
-		# """
-		# TODO: this is no longer true - not sure if it matters
-		# :type local_player: MediaPlayer.MediaPlayer
-		# :type remote_player: MediaPlayer.PlexPlayer
-		# """
-		super(TrackPair, self).__init__(source_player, destination_player)
-		self.logger = logging.getLogger('PlexSync.TrackPair')
-		self.source = source_track
+    def __init__(self, source_player: MediaPlayer, destination_player: MediaPlayer, source_track: AudioTag) -> None:
+        super(TrackPair, self).__init__(source_player, destination_player)
+        self.logger = logging.getLogger("PlexSync.TrackPair")
+        self.source = source_track
 
-	def albums_similarity(self, destination=None):
-		"""
-		Determines how similar two album names are. It takes into account different conventions for empty album names.
-		:type destination: str
-			optional album title to compare the album name of the source track with
-		:returns a similarity rating [0, 100]
-		:rtype: int
-		"""
-		if destination is None:
-			destination = self.destination
-		if self.both_albums_empty(destination=destination):
-			return 100
-		else:
-			if self.destination_player.name() == "PlexPlayer":
-				return fuzz.ratio(self.source.album, destination.album().title)
-			else:
-				return fuzz.ratio(self.source.album, destination.album)
+    @property
+    def quality(self) -> MatchThreshold | None:
+        if self.score is None or self.sync_state in {SyncState.ERROR, SyncState.UNKNOWN}:
+            return None
+        if self.score >= MatchThreshold.PERFECT_MATCH:
+            return MatchThreshold.PERFECT_MATCH
+        if self.score >= MatchThreshold.GOOD_MATCH:
+            return MatchThreshold.GOOD_MATCH
+        if self.score >= MatchThreshold.POOR_MATCH:
+            return MatchThreshold.POOR_MATCH
+        return None
 
-	def both_albums_empty(self, destination=None):
-		if destination is None:
-			destination = self.destination
-		if self.destination_player.name() == "PlexPlayer":
-			return self.source_player.album_empty(self.source.album) and self.destination_player.album_empty(destination.album().title)
-		else:
-			return self.source_player.album_empty(self.source.album) and self.destination_player.album_empty(destination.album)
+    @property
+    def is_sync_candidate(self) -> bool:
+        """Eligible for syncing: either unrated or conflicting."""
+        return self.sync_state in {SyncState.NEEDS_UPDATE, SyncState.CONFLICTING}
 
-	def match(self, candidates=None, match_threshold=30):
-		# TODO: threshold should be configurable
-		if self.source is None:
-			raise RuntimeError('Source track not set')
+    @property
+    def is_unmatched(self) -> bool:
+        """Failed to match due to system or search failure."""
+        return self.sync_state in {SyncState.UNKNOWN, SyncState.ERROR}
 
-		if candidates is None:
-			try:
-				candidates = self.destination_player.search_tracks(key="title", value=self.source.title)
-			except ValueError as e:
-				self.logger.error(f"Failed to search tracks for track '{self.source}' stored at {self.source.file_path}.")
-				raise e
+    def has_min_quality(self, quality: MatchThreshold) -> bool:
+        return self.quality is not None and self.quality >= quality
 
-		if len(candidates) == 0:
-			self.sync_state = SyncState.ERROR
-			self.logger.warning('No match found for {}'.format(self.source))
-			return 0
-		scores = np.array([self.similarity(candidate) for candidate in candidates])
-		ranks = scores.argsort()
-		score = scores[ranks[-1]]
-		if score < match_threshold:
-			self.sync_state = SyncState.ERROR
-			self.logger.debug('Score of best candidate {} is too low: {} < {}'.format(
-				self.destination_player.format(candidates[ranks[-1]]), score, match_threshold
-			))
-			return score
+    def _record_match_quality(self, score: int) -> None:
+        """Track match quality statistics based on the score."""
+        match self.quality:
+            case MatchThreshold.PERFECT_MATCH:
+                self.stats_mgr.increment("perfect_matches")
+            case MatchThreshold.GOOD_MATCH:
+                self.stats_mgr.increment("good_matches")
+            case MatchThreshold.POOR_MATCH:
+                self.stats_mgr.increment("poor_matches")
+            case _:
+                self.stats_mgr.increment("no_matches")
 
-		self.destination = candidates[ranks[-1]]
-		self.logger.debug('Found match with score {} for {}: {}'.format(
-			score, self.source, self.destination_player.format(self.destination)
-		))
-		if score != 100:
-			self.logger.info('Found match with score {} for {}: {}'.format(
-				score, self.source, self.destination_player.format(self.destination)
-			))
+    def reversed(self) -> "TrackPair":
+        """Return a new TrackPair with source and destination roles swapped."""
+        reversed_pair = TrackPair(
+            source_player=self.destination_player,
+            destination_player=self.source_player,
+            source_track=self.destination,
+        )
+        reversed_pair.destination = self.source
+        reversed_pair.rating_source = self.rating_destination
+        reversed_pair.rating_destination = self.rating_source
+        reversed_pair.score = self.score
+        reversed_pair.sync_state = self.sync_state
+        return reversed_pair
 
-		self.rating_source = self.source.rating
+    @staticmethod
+    def display_pair_details(category: str, sync_pairs: List["TrackPair"]) -> None:  # pragma: no cover
+        """Display track details in a tabular format."""
+        if not sync_pairs:
+            print(f"\nNo tracks found for {category}.")
+            return
 
-		# TODO make this a class method so that all code to get rating is standard
-		if self.destination_player.name() == "PlexPlayer":
-			self.rating_destination = self.destination_player.get_normed_rating(self.destination.userRating)
-		else:
-			self.rating_destination = self.destination.rating
+        separator = "-" * 137
+        print(f"\n{category}:\n{separator}")
+        print(AudioTag.DISPLAY_HEADER)
+        print(separator)
 
-		if self.rating_source == self.rating_destination:
-			self.sync_state = SyncState.UP_TO_DATE
-		elif self.rating_source == 0.0 or self.rating_destination == 0.0:
-			self.sync_state = SyncState.NEEDS_UPDATE
-		elif self.rating_source != self.rating_destination:
-			self.sync_state = SyncState.CONFLICTING
-			self.logger.warning('Found match with conflicting ratings: {} (Source: {} | Destination: {})'.format(
-				self.source, self.rating_source, self.rating_destination)
-			)
+        for pair in sync_pairs:
+            print(pair.source.details(pair.source_player))
+            if pair.destination:
+                print(pair.destination.details(pair.destination_player))
+                print(separator)
 
-		return score
+    def albums_similarity(self, destination: AudioTag | None = None) -> int:
+        """Determines how similar two album names are. It takes into account different conventions for empty album names."""
+        if destination is None:
+            destination = self.destination
+        if self.both_albums_empty(destination=destination):
+            return MatchThreshold.PERFECT_MATCH
+        else:
+            return fuzz.ratio(self.source.album, destination.album)
 
-	def resolve_conflict(self):
-		prompt = {
-			"1": "{}: ({}) - Rating: {}".format(self.source_player.name(), self.source, self.rating_source),
-			"2": "{}: ({}) - Rating: {}".format(self.destination_player.name(), self.destination, self.rating_destination),
-			"3": "New rating",
-			"4": "Skip",
-			"5": "Cancel resolving conflicts",
-		}
-		choose = True
-		while choose:
-			choose = False
-			for key in prompt:
-				print('\t[{}]: {}'.format(key, prompt[key]))
+    def both_albums_empty(self, destination: AudioTag | None = None) -> bool:
+        return self.source_player.album_empty(self.source.album) and self.destination_player.album_empty(destination.album)
 
-			choice = input('Select how to resolve conflicting rating: ')
-			if choice == '1':
-				# apply source rating to destination
-				self.destination_player.update_rating(self.destination, self.rating_source)
-				return True
-			elif choice == '2':
-				# apply destination rating to source
-				self.source_player.update_rating(self.source, self.rating_destination)
-				return True
-			elif choice == '3':
-				# apply new rating to source and destination
-				new_rating = input('Please enter a rating between 0 and 10: ')
-				try:
-					new_rating = int(new_rating) / 10
-					if new_rating < 0:
-						raise Exception('Ratings below 0 not allowed')
-					elif new_rating > 1:
-						raise Exception('Ratings above 10 not allowed')
-					self.destination_player.update_rating(self.destination, new_rating)
-					self.source_player.update_rating(self.source, new_rating)
-					return True
-				except Exception as e:
-					print('Error:', e)
-					print('Rating {} is not a valid rating, please choose an integer between 0 and 10'.format(new_rating))
-					choose = True
-			elif choice == '4':
-				return True
-			elif choice == '5':
-				return False
-			else:
-				print('{} is not a valid choice, please try again.'.format(choice))
-				choose = True
+    def _get_cache_match(self) -> AudioTag | None:
+        """Attempt to retrieve a cached match for the current source track."""
+        if not self.cache_mgr.match_cache:
+            return None
 
-		print('you chose {} which is {}'.format(choice, prompt[choice]))
-		return NotImplemented
+        cached_id, cached_score = self.cache_mgr.get_match(
+            self.source.ID,
+            source_name=self.source_player.name(),
+            dest_name=self.destination_player.name(),
+        )
 
-	def similarity(self, candidate):
-		"""
-		Determines the matching similarity of @candidate with the source query track
-		:type candidate: Track
-		:returns a similarity rating [0.0, 100.0]
-		:rtype: float
-		"""
-		if self.destination_player.name() == "PlexPlayer":
-			scores = np.array([
-				fuzz.ratio(self.source.title, candidate.title),
-				fuzz.ratio(self.source.artist, candidate.artist().title),
-				100. if self.source.track == candidate.index else 0.,
-				self.albums_similarity(destination=candidate)])
-		else:
-			scores = np.array([
-				fuzz.ratio(self.source.title, candidate.title),
-				fuzz.ratio(self.source.artist, candidate.artist),
-				100. if self.source.track == candidate.track else 0.,
-				self.albums_similarity(destination=candidate)])
-		return np.average(scores)
+        if not cached_id or cached_score is None:
+            return None
+        if cached_score < MatchThreshold.GOOD_MATCH:
+            return None
 
-	def sync(self, force=False):
-		if self.rating_destination <= 0.0 or force:
-			# Propagate the rating of the source track to the destination track
-			self.destination_player.update_rating(self.destination, self.rating_source)
-		else:
-			return False
-		return True
+        candidates = self.destination_player.search_tracks(key="id", value=cached_id)
+        if candidates:
+            self.stats_mgr.increment("cache_hits")
+            destination_track = candidates[0]
+
+            self.score = cached_score
+            return destination_track
+        return None
+
+    def _search_candidates(self) -> List[AudioTag]:
+        """Search for track candidates matching the source track in the destination player."""
+        if not self.source.title:
+            self.logger.error(f"Source track has no title: {self.source.file_path}")
+            return []
+        try:
+            candidates = self.destination_player.search_tracks(key="title", value=self.source.title)
+            return candidates
+        except ValueError as e:
+            self.logger.error(f"Search failed for '{self.source.title}.")
+            raise e
+
+    def _get_best_match(self, candidates: List[AudioTag], match_threshold: int = MatchThreshold.MINIMUM_ACCEPTABLE) -> Tuple[AudioTag | None, int]:
+        """Find the best matching track from a list of candidates based on similarity score."""
+        if not candidates:
+            return None, 0
+
+        scores = np.array([self.similarity(candidate) for candidate in candidates])
+        best_idx = np.argmax(scores)
+        best_score = scores[best_idx]
+
+        if best_score < match_threshold:
+            self.logger.debug(f"Best candidate score too low: {best_score} < {match_threshold}")
+            return None, best_score
+
+        best_match = candidates[best_idx]
+        return best_match, best_score
+
+    def _set_cache_match(self, best_match: AudioTag, score: float | None = None) -> None:
+        """Store a successful match in the cache along with its score."""
+        if not self.cache_mgr.match_cache:
+            return
+
+        self.cache_mgr.set_match(self.source.ID, best_match.ID, self.source_player.name(), self.destination_player.name(), score)
+
+    def find_best_match(self, candidates: List[AudioTag] | None = None, match_threshold: int = MatchThreshold.MINIMUM_ACCEPTABLE) -> Tuple[AudioTag | None, int]:
+        """Find the best matching track from candidates or by searching."""
+        cached_match = self._get_cache_match()
+        if cached_match:
+            return cached_match, self.score
+
+        if candidates is None:
+            candidates = self._search_candidates()
+
+        if not candidates:
+            self.logger.warning(f"No candidates found for {self.source}")
+            return None, 0
+
+        best_match, best_score = self._get_best_match(candidates, match_threshold)
+
+        if best_match:
+            self._set_cache_match(best_match, best_score)
+
+            self.logger.debug(f"Found match with score {best_score} for {self.source} - : - {best_match}")
+            if best_score != MatchThreshold.PERFECT_MATCH:
+                self.logger.info(f"Found match with score {best_score} for {self.source}: {best_match}")
+            if best_score < MatchThreshold.GOOD_MATCH:
+                self.logger.debug(f"Source: {self.source}")
+                self.logger.debug(f"Best Match: {best_match}")
+
+        return best_match, best_score
+
+    def match(self, candidates: List[AudioTag] | None = None, match_threshold: int = MatchThreshold.MINIMUM_ACCEPTABLE) -> bool:
+        """Find matching track on destination player"""
+        if self.source is None:
+            raise RuntimeError("Source track not set")
+
+        best_match, score = self.find_best_match(candidates, match_threshold)
+
+        if not best_match:
+            self.sync_state = SyncState.ERROR
+            return False
+
+        self.destination = best_match
+
+        src = self.rating_source = self.source.rating or Rating.unrated()
+        dst = self.rating_destination = self.destination.rating or Rating.unrated()
+
+        if src == dst:
+            self.sync_state = SyncState.UP_TO_DATE
+        elif src and dst.is_unrated:
+            self.sync_state = SyncState.NEEDS_UPDATE
+        else:
+            self.sync_state = SyncState.CONFLICTING
+            self.logger.warning(f"Found match with conflicting ratings: {self.source} " f"(Source: {src.to_display()} | " f"Destination: {dst.to_display()})")
+
+        self.score = score
+        self._record_match_quality(score)
+        self.stats_mgr.increment("tracks_matched")
+        return True
+
+    def similarity(self, candidate: AudioTag) -> float:
+        """Determines the matching similarity of @candidate with the source query track"""
+        # TODO: add path similarity
+        scores = np.array(
+            [
+                fuzz.ratio(self.source.title, candidate.title),
+                fuzz.ratio(self.source.artist, candidate.artist),
+                MatchThreshold.PERFECT_MATCH if self.source.track == candidate.track else 0,
+                self.albums_similarity(destination=candidate),
+            ]
+        )
+        return np.average(scores)
+
+    def sync(self) -> None:
+        """Synchronizes the source and destination tracks."""
+        self.destination_player.update_rating(self.destination, self.rating_source)
+        self.stats_mgr.increment("tracks_updated")
 
 
 class PlaylistPair(SyncPair):
-	# TODO: finish implementing playlist sync for MediaMonkey -> Plexfo
-	remote: [Playlist]
+    source: Playlist
+    destination: Playlist | None = None
 
-	def __init__(self, local_player, remote_player, local_playlist):
-		"""
-		:type local_player: MediaPlayer.MediaPlayer
-		:type remote_player: MediaPlayer.PlexPlayer
-		:type local_playlist: Playlist
-		"""
-		super(PlaylistPair, self).__init__(local_player, remote_player)
-		self.logger = logging.getLogger('PlexSync.TrackPair')
-		self.local = local_playlist
+    def __init__(self, source_player: MediaPlayer, destination_player: MediaPlayer, source_playlist: Playlist) -> None:
+        """Initialize playlist pair with consistent naming"""
+        super(PlaylistPair, self).__init__(source_player, destination_player)
+        self.status_mgr = get_manager().get_status_manager()
+        self.logger = logging.getLogger("PlexSync.PlaylistPair")
+        self.source = source_playlist
 
-	def match(self):
-		"""
-		If the local playlist does not exist on the remote player, create it
-		:return: None
-		"""
-		self.remote = self.remote_player.find_playlist(title=self.local.name)
+    def match(self) -> bool:
+        """Find matching playlist on destination player based on name."""
+        matches = self.destination_player.search_playlists("title", self.source.name)
+        self.destination = matches[0] if matches else None
 
-	def resolve_conflict(self):
-		raise NotImplementedError
+        if self.destination is None:
+            self.sync_state = SyncState.NEEDS_UPDATE
+            self.logger.info(f"Playlist {self.source.name} needs to be created")
+            return False
 
-	def similarity(self, candidate):
-		raise NotImplementedError
+        if not self.source.tracks:
+            self.source_player.load_playlist_tracks(self.source)
 
-	def sync(self):
-		"""
-		This sync routine is non-destructive and one-way. It will propagate local additions to the remote. Replicas
-		existing only on the remote will not be removed or propagated to the local replica.
-		:return: flag indicating success
-		:rtype: bool
-		"""
-		self.logger.info('Synchronizing playlist {}'.format(self.local.name))
-		track_pairs = [TrackPair(self.local_player, self.remote_player, track) for track in self.local.tracks]
-		for pair in track_pairs:
-			pair.match()
+        if not self.destination.tracks:
+            self.destination_player.load_playlist_tracks(self.destination)
 
-		if self.remote is None:  # create a new playlist with all tracks
-			remote_tracks = [pair.remote for pair in track_pairs if pair.remote is not None]
-			self.remote = self.remote_player.create_playlist(self.local.name, remote_tracks)
-		else:  # playlist already exists, check which items need to be updated
-			remote_tracks = self.remote.items()
-			for pair in track_pairs:
-				if pair.remote not in remote_tracks:
-					self.remote_player.update_playlist(self.remote, pair.remote, True)
+        missing = self.destination.missing_tracks(self.source)
+        if missing:
+            self.sync_state = SyncState.NEEDS_UPDATE
+            self.logger.info(f"Found {len(missing)} missing tracks in playlist {self.destination}")
+        else:
+            self.sync_state = SyncState.UP_TO_DATE
+            self.logger.info(f"Playlist {self.source.name} is up to date")
 
-		return True
+        self.stats_mgr.increment("playlists_matched")
+        return True
+
+    def similarity(self, candidate: Playlist) -> float:
+        """Determines the similarity of the playlist with a candidate."""
+        raise NotImplementedError
+
+    def _create_new_playlist(self, track_pairs: List[TrackPair]) -> bool:
+        """Create a new playlist on the destination player with matched tracks."""
+        destination_tracks = [pair.destination for pair in track_pairs]
+        self.destination = self.destination_player.create_playlist(self.source.name, destination_tracks)
+        self.logger.info(f"Created new playlist {self.source.name} with {len(destination_tracks)} tracks")
+        self.stats_mgr.increment("playlists_created")
+        return True
+
+    def _update_existing_playlist(self, track_pairs: List[TrackPair]) -> bool:
+        """Update an existing playlist on the destination player with missing tracks."""
+        updates = []
+        if len(track_pairs) > 0:
+            for pair in track_pairs:
+                if not self.destination.has_track(pair.destination):
+                    self.logger.debug(f"Track not found in playlist {self.destination}: {pair.destination}")
+                    updates.append(pair.destination)
+
+        if updates:
+            self.logger.debug(f"Adding {len(updates)} missing tracks to playlist {self.destination}")
+            self.destination_player.sync_playlist(self.destination, updates)
+            self.stats_mgr.increment("playlists_updated")
+            return True
+        else:
+            self.logger.debug(f"Playlist {self.source.name} is up to date")
+            return False
+
+    def _match_tracks(self) -> Tuple[List[TrackPair], List[AudioTag]]:
+        """Helper method to match tracks from the source playlist."""
+        track_pairs = []
+        unmatched = []
+
+        if len(self.source.tracks) == 0:
+            self.source_player.load_playlist_tracks(self.source)
+
+        if len(self.source.tracks) > 0:
+            bar = None
+            if len(self.source.tracks) > 50:
+                bar = self.status_mgr.start_phase(f"Matching tracks for playlist '{self.source.name}'", total=len(self.source.tracks))
+            for track in self.source.tracks:
+                bar.update() if bar else None
+                pair = TrackPair(self.source_player, self.destination_player, track)
+                pair.match()
+                if pair.destination is not None:
+                    track_pairs.append(pair)
+                else:
+                    unmatched.append(track)
+            bar.close() if bar else None
+
+        return track_pairs, unmatched
+
+    def sync(self, force: bool = False) -> bool:
+        """Non-destructive one-way sync from source to destination."""
+        if self.sync_state is SyncState.UP_TO_DATE:
+            return True
+
+        self.logger.info(f"Synchronizing playlist {self.source.name}")
+        self.logger.debug(f"Source playlist has {len(self.source.tracks)} tracks")
+
+        track_pairs, unmatched = self._match_tracks()
+
+        self.logger.info(f"Matched {len(track_pairs)}/{len(self.source.tracks)} tracks for playlist {self.source.name}")
+        if unmatched:
+            self.logger.warning(f"Failed to match {len(unmatched)} tracks:")
+            for track in unmatched:
+                self.logger.warning(f"  - {track}")
+
+        if not track_pairs:
+            self.logger.warning(f"No tracks could be matched for playlist {self.source.name}")
+            return False
+
+        if self.destination is None:
+            return self._create_new_playlist(track_pairs)
+        else:
+            return self._update_existing_playlist(track_pairs)
