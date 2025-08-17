@@ -194,13 +194,13 @@ class TestFinalizeRatingStrategy:
         assert handler.rating_scale == RatingScale.NORMALIZED
         assert handler.aggressive_inference is True
 
-    def test_finalize_no_stats_leaves_fields_unset(self, handler):
+    def test_finalize_no_stats_sets_default_scale(self, handler):
         handler.stats_mgr.get.return_value = {}
         handler.finalize_rating_strategy([{"handler": handler}])
         assert handler.fmps_rating_scale is None
-        assert handler.rating_scale is None
+        assert handler.rating_scale == RatingScale.ZERO_TO_FIVE
 
-    def test_finalize_strategy_skips_with_no_owned_conflicts(self, handler):
+    def test_finalize_strategy_skips_with_no_owned_conflicts_sets_default_scale(self, handler):
         other_handler = MagicMock()
         conflicts = [{"handler": other_handler}, {"handler": other_handler}]
 
@@ -209,7 +209,7 @@ class TestFinalizeRatingStrategy:
         handler.finalize_rating_strategy(conflicts)
 
         assert handler.fmps_rating_scale is None
-        assert handler.rating_scale is None
+        assert handler.rating_scale == RatingScale.ZERO_TO_FIVE
 
 
 class TestApplyTags:

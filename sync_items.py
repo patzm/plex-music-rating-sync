@@ -9,9 +9,7 @@ class AudioTag(object):
     MAX_ALBUM_LENGTH = 30
     MAX_TITLE_LENGTH = 40
     MAX_FILE_PATH_LENGTH = 50
-    DISPLAY_HEADER = (
-        f"{'':<7} {'Track':<5} {'Artist':<{MAX_ARTIST_LENGTH}} " f"{'Album':<{MAX_ALBUM_LENGTH}} " f"{'Title':<{MAX_TITLE_LENGTH}} " f"{'File Path':<{MAX_FILE_PATH_LENGTH}}"
-    )
+    DISPLAY_HEADER = f"{'':<7} {'Track':<5} {'Artist':<{MAX_ARTIST_LENGTH}} {'Album':<{MAX_ALBUM_LENGTH}} {'Title':<{MAX_TITLE_LENGTH}} {'File Path':<{MAX_FILE_PATH_LENGTH}}"
 
     def __init__(self, artist: str = "", album: str = "", title: str = "", **kwargs):
         self.ID = kwargs.get("ID", None)
@@ -25,7 +23,8 @@ class AudioTag(object):
         self.duration = kwargs.get("duration", -1)
 
     def __str__(self) -> str:
-        return " - ".join([self.artist, self.album, self.title])
+        # Safely handle None values for artist, album, title
+        return " - ".join([str(x) if x is not None else "" for x in [self.artist, self.album, self.title]])
 
     def __repr__(self) -> str:
         return f"AudioTag({self!s})"
@@ -36,7 +35,7 @@ class AudioTag(object):
         value = str(value or default)
         if len(value) <= length:
             return value
-        return f"{value[:length - 3]}..." if from_end else f"...{value[-(length - 3):]}"
+        return f"{value[: length - 3]}..." if from_end else f"...{value[-(length - 3) :]}"
 
     def details(self, player: Optional["MediaPlayer"] = None) -> str:
         """Print formatted track details."""
@@ -46,7 +45,7 @@ class AudioTag(object):
         album = self.truncate(self.album, self.MAX_ALBUM_LENGTH)
         title = self.truncate(self.title, self.MAX_TITLE_LENGTH)
         file_path = self.truncate(self.file_path, self.MAX_FILE_PATH_LENGTH, from_end=False)
-        player_rating = f"{player.abbr if player else "  "}[{track_rating}]"
+        player_rating = f"{player.abbr if player else '  '}[{track_rating}]"
         return (
             f"{player_rating:<7} {track_number:{5}} {artist:<{self.MAX_ARTIST_LENGTH}} "
             f"{album:<{self.MAX_ALBUM_LENGTH}} {title:<{self.MAX_TITLE_LENGTH}} "

@@ -367,7 +367,6 @@ class VorbisHandler(AudioTagHandler):
     # ------------------------------
     def finalize_rating_strategy(self, conflicts: List[dict]) -> None:
         conflicts = [c for c in conflicts if c.get("handler") is self]
-        # self._print_summary()
 
         # NOTE: Vorbis tags have two different rating scales in common use:
         def pick_scale(field: VorbisField) -> RatingScale | None:
@@ -380,6 +379,11 @@ class VorbisHandler(AudioTagHandler):
 
         self.fmps_rating_scale = pick_scale(VorbisField.FMPS_RATING)
         self.rating_scale = pick_scale(VorbisField.RATING)
+
+        if self.fmps_rating_scale is None and self.rating_scale is None:
+            self.rating_scale = RatingScale.ZERO_TO_FIVE
+            self.logger.info("No Vorbis rating scale could be inferred from your files. Defaulting to writing ratings using the 'RATING' tag with a 0-5 scale.")
+
         self.aggressive_inference = True
 
     def _print_summary(self) -> None:  # pragma: no cover
@@ -412,8 +416,10 @@ class VorbisHandler(AudioTagHandler):
         if rating is not None:
             if self.fmps_rating_scale is not None:
                 audio_file[VorbisField.FMPS_RATING] = rating.to_str(self.fmps_rating_scale)
+                self.logger.trace(f"Updated FLAC/Vorbis file '{audio_file.filename}' with rating {rating.to_display()} in tag: {VorbisField.FMPS_RATING.value}")
             if self.rating_scale is not None:
                 audio_file[VorbisField.RATING] = rating.to_str(self.rating_scale)
+                self.logger.trace(f"Updated FLAC/Vorbis file '{audio_file.filename}' with rating {rating.to_display()} in tag: {VorbisField.RATING.value}")
         return audio_file
 
     # ------------------------------
@@ -1007,12 +1013,14 @@ class FileSystemProvider:
         """Helper function to save changes to an audio file."""
         if self.config_mgr.dry:
             self.logger.info(f"Dry run enabled. Changes to {audio_file.filename} will not be saved.")
-            return True  # Simulate a successful save
+            return True
 
         try:
             if isinstance(audio_file, ID3FileType):
+                self.logger.trace(f"Saving MP3 file: {audio_file.filename}")
                 audio_file.save(v2_version=3)
             else:
+                self.logger.trace(f"Saving FLAC/Vorbis file: {audio_file.filename}")
                 audio_file.save()
             self.logger.info(f"Successfully saved changes to {audio_file.filename}")
             return True
